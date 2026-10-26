@@ -1,0 +1,38 @@
+# Local credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+backend/.env
+deploy/hosts.env
+
+# Claude and local planning files
+**/.claude/
+**/CLAUDE*.md
+**/claude*.md
+BASE.md
+plans/
+errors/
+
+# Private deployment notes and infrastructure scripts
+docs/ARCHITECTURE.md
+docs/ROADMAP.md
+docs/adr/
+docs/backend-auth-configuration.md
+docs/deployment.md
+docs/phase1-delivery-gate.md
+deploy/demo/
+deploy/scripts/backup-install.sh
+deploy/scripts/clear-app-data.sh
+deploy/scripts/provision-*.sh
+deploy/scripts/restore.sh
+backend/scripts/local-promote.sh
+
+# Build output, caches, uploads, and local tools
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+backend/target/
+backend/var/
+**/.idea/
+.vscode/
+.DS_Store
