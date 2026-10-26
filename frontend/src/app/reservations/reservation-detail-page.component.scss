@@ -1,0 +1,144 @@
+.reservation-page {
+  padding-block: 1.5rem 4rem;
+}
+
+.back-link,
+.listing-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--primary);
+  font-weight: 600;
+  text-underline-offset: 0.2em;
+}
+
+.reservation-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.status {
+  margin: 0;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.status[data-status="ACCEPTED"],
+.status[data-status="ACTIVE"],
+.status[data-status="COMPLETED"] {
+  color: var(--success);
+}
+
+.status[data-status="PENDING"] {
+  color: var(--warning);
+}
+
+.reservation-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+.details {
+  display: grid;
+  gap: 1rem;
+}
+
+.facts {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding-block: 1rem;
+  border-block: 1px solid var(--border);
+}
+
+.facts > div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.facts dt,
+.muted,
+.coordinates {
+  color: var(--text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.text-block {
+  white-space: pre-line;
+}
+
+.details > .notice-info,
+.details > .field-hint {
+  margin: 0;
+}
+
+.actions {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.actions h2,
+.location h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.actions .notice-error {
+  margin: 0;
+}
+
+.confirm {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.location {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.location .field-hint,
+.coordinates {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.location-map {
+  height: 320px;
+}
+
+@media (max-width: 820px) {
+  .reservation-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+}

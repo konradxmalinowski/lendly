@@ -1,0 +1,173 @@
+<section class="listing-page" aria-labelledby="page-title">
+  <a class="back-link" routerLink="/account/listings">Moje ogłoszenia</a>
+  <header class="listing-heading">
+    <h1 id="page-title" class="page-title" tabindex="-1">{{ editId() ? 'Edytuj ogłoszenie' : 'Nowe ogłoszenie' }}</h1>
+    @if (editId()) {
+      <p class="status-label" [attr.data-status]="status()">{{ statusLabel() }}</p>
+    }
+  </header>
+
+  @if (loading()) {
+    <p class="state-message" role="status">Wczytywanie ogłoszenia…</p>
+  } @else if (loadError()) {
+    <p class="notice-error" role="alert">{{ loadError() }}</p>
+  } @else {
+    @if (errorMessage()) {
+      <div class="notice-error" role="alert">
+        <p>{{ errorMessage() }}</p>
+        @if (missing().length > 0) {
+          <ul>
+            @if (missing().includes('images')) { <li>Dodaj co najmniej jedno zdjęcie.</li> }
+            @if (missing().includes('handoverLat')) { <li>Wskaż na mapie punkt odbioru.</li> }
+            @if (missing().includes('categoryKey')) { <li>Wybierz kategorię.</li> }
+          </ul>
+        }
+      </div>
+    }
+    @if (successMessage()) {
+      <div class="notice-success" role="status">
+        <p>{{ successMessage() }}</p>
+        @if (isActive() && listing(); as current) {
+          <a [routerLink]="['/items', current.id]">Zobacz ogłoszenie tak, jak widzą je inni</a>
+        }
+      </div>
+    }
+
+    <form class="listing-form" [formGroup]="form" (ngSubmit)="save(!isActive())" novalidate>
+      <section class="form-section" aria-labelledby="basics-title">
+        <h2 id="basics-title">Przedmiot</h2>
+        <div class="form-field">
+          <label for="listing-title">Tytuł</label>
+          <input id="listing-title" type="text" formControlName="title" maxlength="100"
+            [attr.aria-invalid]="showError('title')" [attr.aria-describedby]="showError('title') ? 'title-error' : null">
+          @if (showError('title')) {
+            <p class="field-error" id="title-error">Wpisz tytuł od 3 do 100 znaków.</p>
+          }
+        </div>
+
+        <div class="form-field">
+          <label for="listing-description">Opis</label>
+          <textarea id="listing-description" formControlName="description" maxlength="2000" aria-describedby="description-hint"
+            [attr.aria-invalid]="showError('description')"></textarea>
+          <p class="field-hint" id="description-hint">Napisz, co dokładnie pożyczasz, co jest w zestawie i na co zwrócić uwagę.</p>
+          @if (showError('description')) {
+            <p class="field-error" role="alert">Opis powinien mieć od 10 do 2000 znaków.</p>
+          }
+        </div>
+
+        <div class="field-pair">
+          <div class="form-field">
+            <label for="listing-category">Kategoria</label>
+            <select id="listing-category" formControlName="categoryKey" [attr.aria-invalid]="showError('categoryKey')">
+              <option value="" disabled>Wybierz kategorię</option>
+              @for (category of categories(); track category.key) {
+                <option [value]="category.key">{{ category.displayName }}</option>
+              }
+            </select>
+            @if (showError('categoryKey')) {
+              <p class="field-error">Wybierz kategorię.</p>
+            }
+          </div>
+          <div class="form-field">
+            <label for="listing-condition">Stan</label>
+            <select id="listing-condition" formControlName="condition">
+              @for (entry of conditions; track entry[0]) {
+                <option [value]="entry[0]">{{ entry[1] }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section" aria-labelledby="price-title">
+        <h2 id="price-title">Cena</h2>
+        <fieldset class="choice-group">
+          <legend class="visually-hidden">Rodzaj pożyczki</legend>
+          <label class="choice"><input type="radio" formControlName="pricingType" value="FREE"> Za darmo</label>
+          <label class="choice"><input type="radio" formControlName="pricingType" value="PAID"> Płatnie, za dzień</label>
+        </fieldset>
+        @if (form.controls.pricingType.value === 'PAID') {
+          <div class="form-field price-field">
+            <label for="listing-price">Cena za dzień (zł)</label>
+            <input id="listing-price" type="text" inputmode="decimal" formControlName="dailyPrice" placeholder="np. 15,00"
+              aria-describedby="price-hint" [attr.aria-invalid]="showError('dailyPrice')">
+            <p class="field-hint" id="price-hint">Lendly nie pobiera płatności. Rozliczacie się bezpośrednio przy odbiorze.</p>
+            @if (showError('dailyPrice')) {
+              <p class="field-error" role="alert">Podaj kwotę od 0,01 do 9999,99 zł.</p>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="form-section" aria-labelledby="photos-title">
+        <h2 id="photos-title">Zdjęcia</h2>
+        <p class="field-hint">Do 8 zdjęć. Pierwsze będzie okładką. Przed wysłaniem usuwamy z plików dane o miejscu wykonania zdjęcia.</p>
+        <ul class="photo-grid">
+          @for (image of images(); track image.id; let first = $first) {
+            <li class="photo">
+              <img [src]="image.url" alt="" width="160" height="120">
+              @if (first) { <span class="photo-badge">Okładka</span> }
+              <button class="button-quiet" type="button" [disabled]="removingImage() === image.id" (click)="removeImage(image)">
+                {{ removingImage() === image.id ? 'Usuwanie…' : 'Usuń' }}<span class="visually-hidden"> zdjęcie {{ $index + 1 }}</span>
+              </button>
+            </li>
+          }
+          @for (item of pending(); track item.key) {
+            <li class="photo" [class.photo-failed]="item.status === 'failed'">
+              @if (item.previewUrl) {
+                <img [src]="item.previewUrl" alt="" width="160" height="120">
+              } @else {
+                <span class="photo-placeholder"></span>
+              }
+              <span class="photo-status" role="status">
+                @switch (item.status) {
+                  @case ('preparing') { Przygotowywanie… }
+                  @case ('queued') { {{ editId() ? 'Czeka na przesłanie' : 'Prześlemy po zapisaniu' }} }
+                  @case ('uploading') { Przesyłanie… }
+                  @case ('failed') { {{ item.error }} }
+                }
+              </span>
+              @if (item.status === 'queued' || item.status === 'failed') {
+                <button class="button-quiet" type="button" (click)="dismissPending(item.key)">Usuń<span class="visually-hidden"> plik {{ item.name }}</span></button>
+              }
+            </li>
+          }
+        </ul>
+        <lendly-ai-scan-panel [image]="scanImage()" [categories]="categories()" (apply)="applySuggestion($event)" />
+        @if (imageCount() < 8) {
+          <label class="button-secondary file-button">
+            Dodaj zdjęcia
+            <input type="file" accept="image/*" multiple (change)="selectFiles(fileInput)" #fileInput>
+          </label>
+        }
+        @if (imageError()) {
+          <p class="field-error" role="alert">{{ imageError() }}</p>
+        }
+      </section>
+
+      <section class="form-section" aria-labelledby="location-title">
+        <h2 id="location-title">Punkt odbioru</h2>
+        <p class="field-hint">Wskaż miejsce, w którym chcesz przekazać przedmiot. Inni zobaczą tylko okolicę w promieniu około 600 m, nie dokładny punkt.</p>
+        <lendly-location-picker [point]="point()" (pointChange)="setPoint($event)" />
+        @if (point()) {
+          <p class="point-note">Punkt ustawiony.</p>
+        } @else if (pointTouched() && isActive()) {
+          <p class="field-error">Opublikowane ogłoszenie musi mieć punkt odbioru.</p>
+        }
+      </section>
+
+      <div class="form-actions">
+        @if (isActive()) {
+          <button class="button-primary" type="submit" [disabled]="saving()">{{ saving() ? 'Zapisywanie…' : 'Zapisz zmiany' }}</button>
+        } @else {
+          <button class="button-primary" type="submit" [disabled]="saving()">{{ saving() ? 'Zapisywanie…' : 'Opublikuj ogłoszenie' }}</button>
+          <button class="button-secondary" type="button" [disabled]="saving()" (click)="save(false)">Zapisz szkic</button>
+        }
+      </div>
+    </form>
+
+    @if (editId(); as listingId) {
+      <lendly-availability-blocks [listingId]="listingId" />
+    }
+  }
+</section>

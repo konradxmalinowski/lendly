@@ -1,0 +1,111 @@
+// Shared by both map components with encapsulation disabled, because MapLibre markers are created outside Angular templates.
+lendly-listing-map,
+lendly-location-picker {
+  display: block;
+  min-width: 0;
+}
+
+lendly-listing-map {
+  height: 100%;
+}
+
+.map-frame {
+  position: relative;
+  height: 100%;
+  min-height: 280px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--muted-background);
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.map-frame-failed .map-canvas {
+  display: none;
+}
+
+.map-status {
+  position: absolute;
+  inset: auto 0.75rem 0.75rem;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.map-frame-failed .map-status {
+  inset: 50% 1rem auto;
+  transform: translateY(-50%);
+}
+
+// Price tags echo the price line on result cards, so a pin and its card read as the same object.
+.map-pin {
+  min-height: 28px;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--primary);
+  font: 600 0.8rem/1.2 Inter, "Segoe UI", sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.map-pin:hover,
+.map-pin:focus-visible,
+.map-pin.is-active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.map-handover-pin {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--surface);
+  border-radius: 50% 50% 50% 0;
+  background: var(--primary);
+  transform: rotate(-45deg);
+  cursor: grab;
+}
+
+.map-frame-picker {
+  height: 320px;
+}
+
+.map-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid var(--text-secondary);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.map-frame-failed .map-crosshair {
+  display: none;
+}
+
+.picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 0.75rem;
+}

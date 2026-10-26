@@ -1,0 +1,127 @@
+<section class="reservation-page" aria-labelledby="page-title">
+  <a class="back-link" routerLink="/reservations" [queryParams]="isOwner() ? { role: 'owner' } : {}">Wszystkie rezerwacje</a>
+
+  @if (loading()) {
+    <h1 id="page-title" class="visually-hidden" tabindex="-1">Rezerwacja</h1>
+    <p class="state-message" role="status">Wczytywanie rezerwacji…</p>
+  } @else if (loadError()) {
+    <h1 id="page-title" class="page-title" tabindex="-1">Rezerwacja niedostępna</h1>
+    <p class="notice-error" role="alert">{{ loadError() }}</p>
+  } @else if (reservation(); as item) {
+    <header class="reservation-heading">
+      <div>
+        <p class="page-eyebrow">{{ isOwner() ? 'Prośba o Twój przedmiot' : 'Twoja rezerwacja' }}</p>
+        <h1 id="page-title" class="page-title" tabindex="-1">{{ item.listing.title }}</h1>
+      </div>
+      <p class="status" [attr.data-status]="item.status">{{ statusLabels[item.status] }}</p>
+    </header>
+
+    @if (successMessage()) {
+      <p class="notice-success" role="status">{{ successMessage() }}</p>
+    }
+
+    <div class="reservation-layout">
+      <div class="details">
+        <dl class="facts">
+          <div><dt>Termin</dt><dd>{{ range() }} ({{ daysLabel(item.days) }})</dd></div>
+          <div><dt>Cena</dt><dd>{{ dailyPrice() }}</dd></div>
+          <div><dt>Koszt</dt><dd class="price-line">{{ cost() }}@if (item.pricingType === 'PAID') { <span class="muted"> szacunkowo</span> }</dd></div>
+          <div><dt>{{ isOwner() ? 'Pożycza' : 'Udostępnia' }}</dt><dd>{{ item.counterpart.displayName }}@if (item.counterpart.areaLabel) {<span class="muted">, {{ item.counterpart.areaLabel }}</span>}</dd></div>
+          @if (item.note) {
+            <div><dt>Wiadomość</dt><dd class="text-block">{{ item.note }}</dd></div>
+          }
+          @if (item.decisionReason) {
+            <div><dt>{{ item.status === 'CANCELLED' ? 'Powód anulowania' : 'Powód odrzucenia' }}</dt><dd class="text-block">{{ item.decisionReason }}</dd></div>
+          }
+          @if (item.status === 'CANCELLED') {
+            <div><dt>Anulowano</dt><dd>{{ item.cancelledBy === 'OWNER' ? 'przez właściciela' : 'przez pożyczającego' }}, {{ timestamp(item.cancelledAt) }}</dd></div>
+          }
+          @if (item.handedOverAt) {
+            <div><dt>Wydano</dt><dd>{{ timestamp(item.handedOverAt) }}</dd></div>
+          }
+          @if (item.returnedAt) {
+            <div><dt>Zwrócono</dt><dd>{{ timestamp(item.returnedAt) }}</dd></div>
+          }
+        </dl>
+
+        @if (item.status === 'PENDING') {
+          <p class="notice-info">
+            {{ isOwner() ? 'Odpowiedz do' : 'Właściciel ma czas na odpowiedź do' }} {{ formatDeadline(item.expiresAt) }}.
+            Potem prośba wygaśnie, a termin zostanie zwolniony.
+          </p>
+        }
+        <p class="field-hint">Lendly nie pobiera ani nie gwarantuje płatności. Rozliczacie się bezpośrednio przy odbiorze.</p>
+
+        @if (item.allowedActions.length > 0) {
+          <section class="actions" aria-labelledby="actions-title">
+            <h2 id="actions-title">Co możesz zrobić</h2>
+            @if (actionError()) {
+              <p class="notice-error" role="alert">{{ actionError() }}</p>
+            }
+            @if (confirming(); as pending) {
+              <div class="confirm">
+                <div class="form-field">
+                  <label for="action-reason">
+                    {{ pending === 'REJECT' ? 'Powód odrzucenia' : (item.status === 'PENDING' ? 'Powód wycofania' : 'Powód anulowania') }}
+                    @if (!reasonRequired()) { <span class="muted">(opcjonalnie)</span> }
+                  </label>
+                  <textarea id="action-reason" rows="2" maxlength="300" [(ngModel)]="reason" name="reason"></textarea>
+                  <p class="field-hint">Druga strona zobaczy ten powód.</p>
+                </div>
+                <div class="button-row">
+                  <button class="button-primary" type="button" [disabled]="busy()" (click)="run(pending)">
+                    {{ busy() ? 'Zapisywanie…' : (pending === 'REJECT' ? 'Odrzuć prośbę' : (item.status === 'PENDING' ? 'Wycofaj prośbę' : 'Anuluj rezerwację')) }}
+                  </button>
+                  <button class="button-quiet" type="button" [disabled]="busy()" (click)="closeConfirm()">Wróć</button>
+                </div>
+              </div>
+            } @else {
+              <div class="button-row">
+                @if (can('ACCEPT')) {
+                  <button class="button-primary" type="button" [disabled]="busy()" (click)="run('ACCEPT')">Akceptuj prośbę</button>
+                }
+                @if (can('HANDOVER')) {
+                  <button class="button-primary" type="button" [disabled]="busy()" (click)="run('HANDOVER')">Przedmiot wydany</button>
+                }
+                @if (can('RETURN')) {
+                  <button class="button-primary" type="button" [disabled]="busy()" (click)="run('RETURN')">Przedmiot zwrócony</button>
+                }
+                @if (can('REJECT')) {
+                  <button class="button-secondary" type="button" [disabled]="busy()" (click)="startConfirm('REJECT')">Odrzuć</button>
+                }
+                @if (can('CANCEL')) {
+                  <button class="button-secondary" type="button" [disabled]="busy()" (click)="startConfirm('CANCEL')">
+                    {{ item.status === 'PENDING' ? 'Wycofaj prośbę' : 'Anuluj rezerwację' }}
+                  </button>
+                }
+              </div>
+              @if (item.status === 'ACCEPTED' && isOwner() && !can('HANDOVER')) {
+                <p class="field-hint">Wydanie przedmiotu oznaczysz od dnia przed rozpoczęciem rezerwacji.</p>
+              }
+            }
+          </section>
+        }
+
+        <a class="listing-link" [routerLink]="['/items', item.listing.id]">Zobacz ogłoszenie</a>
+        <lendly-report-button targetType="USER" [targetId]="item.counterpart.id"
+          [label]="isOwner() ? 'Zgłoś pożyczającego' : 'Zgłoś właściciela'" />
+      </div>
+
+      <section class="location" aria-labelledby="location-title">
+        <h2 id="location-title">{{ handoverPins().length > 0 ? 'Punkt odbioru' : 'Okolica odbioru' }}</h2>
+        @if (handoverPins().length > 0) {
+          <p class="field-hint">Dokładny punkt wskazany przez właściciela. Widzą go tylko strony tej rezerwacji.</p>
+          <lendly-listing-map class="location-map" [pins]="handoverPins()" regionLabel="Mapa z dokładnym punktem odbioru"
+            failureText="Mapa jest teraz niedostępna." />
+          <p class="coordinates">Współrzędne: {{ item.handoverLat }}, {{ item.handoverLng }}</p>
+        } @else if (area(); as approximate) {
+          @if (item.status === 'PENDING') {
+            <p class="field-hint">Dokładny punkt pojawi się po akceptacji rezerwacji.</p>
+          }
+          <lendly-listing-map class="location-map" [area]="approximate" regionLabel="Mapa z przybliżoną okolicą odbioru"
+            failureText="Mapa jest teraz niedostępna." />
+        }
+      </section>
+    </div>
+  }
+</section>

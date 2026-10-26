@@ -1,0 +1,103 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "cli": {
+    "cache": {
+      "enabled": false
+    }
+  },
+  "version": 1,
+  "newProjectRoot": "projects",
+  "projects": {
+    "lendly": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "lendly",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "index": "src/index.html",
+            "tsConfig": "tsconfig.app.json",
+            "inlineStyleLanguage": "scss",
+            "styles": [
+              "src/styles.scss",
+              {
+                "input": "node_modules/maplibre-gl/dist/maplibre-gl.css",
+                "bundleName": "maplibre",
+                "inject": false
+              }
+            ],
+            "assets": [
+              {
+                "glob": "theme-init.js",
+                "input": "public"
+              },
+              {
+                "glob": "maplibre-gl-worker.mjs",
+                "input": "node_modules/maplibre-gl/dist",
+                "output": "maplibre"
+              },
+              {
+                "glob": "maplibre-gl-shared.mjs",
+                "input": "node_modules/maplibre-gl/dist",
+                "output": "maplibre"
+              }
+            ],
+            "server": "src/main.server.ts",
+            "outputMode": "static"
+          },
+          "configurations": {
+            "production": {
+              "optimization": {
+                "fonts": {
+                  "inline": false
+                },
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "scripts": true
+              },
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "lendly:build:production"
+            },
+            "development": {
+              "buildTarget": "lendly:build:development"
+            }
+          },
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          }
+        }
+      }
+    }
+  }
+}

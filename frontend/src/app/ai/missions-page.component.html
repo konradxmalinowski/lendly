@@ -1,0 +1,121 @@
+<section class="missions-page" aria-labelledby="page-title">
+  <p class="page-eyebrow">Misje</p>
+  <h1 id="page-title" class="page-title" tabindex="-1">Co chcesz zrobić?</h1>
+  <p class="lead">Opisz zadanie. Podpowiemy, jakie rzeczy się przydadzą, i pokażemy, kto w okolicy je udostępnia.</p>
+
+  <form class="mission-form" (ngSubmit)="submit()" novalidate>
+    <div class="form-field">
+      <label for="mission-task">Zadanie</label>
+      <textarea id="mission-task" name="task" rows="3" maxlength="500" [(ngModel)]="task"
+        placeholder="Np. chcę zamontować półkę na betonowej ścianie"></textarea>
+    </div>
+    <div class="examples" aria-label="Przykłady">
+      @for (example of examples; track example) {
+        <button class="example" type="button" (click)="useExample(example)">{{ example }}</button>
+      }
+    </div>
+
+    <div class="options">
+      <div class="form-field">
+        <label for="mission-start">Od <span class="muted">(opcjonalnie)</span></label>
+        <input id="mission-start" type="date" name="start" [min]="today" [max]="maxStart" [(ngModel)]="startDate">
+      </div>
+      <div class="form-field">
+        <label for="mission-end">Do <span class="muted">(opcjonalnie)</span></label>
+        <input id="mission-end" type="date" name="end" [min]="startDate || today" [max]="maxStart" [(ngModel)]="endDate">
+      </div>
+      <label class="near">
+        <input type="checkbox" [checked]="useLocation()" (change)="toggleLocation($any($event.target).checked)">
+        Tylko do 10 km ode mnie
+      </label>
+    </div>
+    @if (locationError()) {
+      <p class="field-hint" role="status">{{ locationError() }}</p>
+    }
+    @if (error()) {
+      <p class="field-error" role="alert">{{ error() }}</p>
+    }
+    <button class="button-primary" type="submit" [disabled]="loading()">{{ loading() ? 'Szukanie…' : 'Znajdź potrzebne rzeczy' }}</button>
+  </form>
+
+  @if (loading()) {
+    <p class="state-message" role="status">Analizujemy zadanie i przeszukujemy ogłoszenia. To może potrwać kilka sekund.</p>
+  }
+
+  @if (result(); as mission) {
+    <section id="mission-results" class="results" tabindex="-1" aria-labelledby="results-title">
+      <h2 id="results-title" class="visually-hidden">Wyniki</h2>
+      @if (mission.safetyNote) {
+        <p class="safety" role="note">{{ mission.safetyNote }}</p>
+      }
+      @if (!mission.aiUsed) {
+        <p class="notice-info">Podpowiedzi AI są teraz niedostępne, więc szukamy po słowach z opisu.
+          <a routerLink="/items" [queryParams]="{ q: task }">Otwórz zwykłą wyszukiwarkę</a></p>
+      } @else if (mission.summary) {
+        <p class="summary">{{ mission.summary }}</p>
+      }
+
+      @if (mission.aiUsed && mission.groups.length === 0) {
+        <div class="empty-state">
+          <h3>Nie rozpoznaliśmy rzeczy do pożyczenia</h3>
+          <p>Opisz zadanie konkretniej, na przykład co chcesz naprawić, zamontować albo zorganizować.</p>
+        </div>
+      }
+
+      @for (group of mission.groups; track group.name) {
+        <article class="group" [class.optional]="!group.essential">
+          <header class="group-head">
+            <h3>{{ group.name }}</h3>
+            <span class="group-tag">{{ group.essential ? 'Niezbędne' : 'Może się przydać' }}</span>
+          </header>
+          @if (group.why) {
+            <p class="why">{{ group.why }}</p>
+          }
+          @if (group.listings.length === 0) {
+            <p class="none">Nikt w okolicy nie udostępnia teraz takiej rzeczy{{ startDate ? ' w tych dniach' : '' }}.</p>
+          } @else {
+            <ul class="listing-list">
+              @for (item of group.listings; track item.id) {
+                <li>
+                  <a class="listing" [routerLink]="['/items', item.id]">
+                    <span class="photo">@if (item.coverImageUrl) { <img [src]="item.coverImageUrl" alt="" width="96" height="72" loading="lazy"> }</span>
+                    <span class="info">
+                      <span class="title">{{ item.title }}</span>
+                      <span class="price-line">{{ price(item) }}</span>
+                      <span class="meta">{{ item.ownerDisplayName }}@if (distance(item); as d) { · {{ d }} }</span>
+                    </span>
+                  </a>
+                </li>
+              }
+            </ul>
+          }
+        </article>
+      }
+
+      @if (!mission.aiUsed) {
+        @if (mission.fallbackListings.length === 0) {
+          <div class="empty-state"><p>Nie znaleźliśmy ogłoszeń pasujących do słów z opisu.</p></div>
+        } @else {
+          <ul class="listing-list">
+            @for (item of mission.fallbackListings; track item.id) {
+              <li>
+                <a class="listing" [routerLink]="['/items', item.id]">
+                  <span class="photo">@if (item.coverImageUrl) { <img [src]="item.coverImageUrl" alt="" width="96" height="72" loading="lazy"> }</span>
+                  <span class="info">
+                    <span class="title">{{ item.title }}</span>
+                    <span class="price-line">{{ price(item) }}</span>
+                    <span class="meta">{{ item.ownerDisplayName }}</span>
+                  </span>
+                </a>
+              </li>
+            }
+          </ul>
+        }
+      }
+
+      @if (mission.aiUsed && foundCount(mission) > 0) {
+        <p class="field-hint">Pokazujemy tylko prawdziwe ogłoszenia z Lendly. Ceny i terminy sprawdzisz na stronie ogłoszenia.</p>
+      }
+    </section>
+  }
+</section>

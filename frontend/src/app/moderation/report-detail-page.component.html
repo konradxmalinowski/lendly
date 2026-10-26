@@ -1,0 +1,114 @@
+<section class="report-page" aria-labelledby="page-title">
+  <a class="back-link" routerLink="/moderation">Wszystkie zgłoszenia</a>
+
+  @if (loading()) {
+    <h1 id="page-title" class="visually-hidden" tabindex="-1">Zgłoszenie</h1>
+    <p class="state-message" role="status">Wczytywanie zgłoszenia…</p>
+  } @else if (loadError()) {
+    <h1 id="page-title" class="page-title" tabindex="-1">Zgłoszenie niedostępne</h1>
+    <p class="notice-error" role="alert">{{ loadError() }}</p>
+  } @else if (report(); as item) {
+    <header class="report-heading">
+      <div>
+        <p class="page-eyebrow">{{ item.target.type === 'LISTING' ? 'Zgłoszone ogłoszenie' : 'Zgłoszony użytkownik' }}</p>
+        <h1 id="page-title" class="page-title" tabindex="-1">{{ item.target.title }}</h1>
+      </div>
+      <p class="status" [attr.data-status]="item.status">{{ statuses[item.status] }}</p>
+    </header>
+
+    @if (successMessage()) {
+      <p class="notice-success" role="status">{{ successMessage() }}</p>
+    }
+
+    <div class="report-layout">
+      <div class="main">
+        <dl class="facts">
+          <div><dt>Powód</dt><dd>{{ reasons[item.reason] }}</dd></div>
+          @if (item.details) {
+            <div><dt>Szczegóły</dt><dd class="text-block">{{ item.details }}</dd></div>
+          }
+          <div><dt>Zgłasza</dt><dd>{{ item.reporter.displayName }}, {{ date(item.createdAt) }}</dd></div>
+          @if (item.target.type === 'LISTING') {
+            <div><dt>Ogłoszenie</dt><dd>{{ item.target.status === 'HIDDEN' ? 'Ukryte' : item.target.status === 'ACTIVE' ? 'Widoczne' : 'Niepubliczne' }}
+              @if (item.target.status === 'ACTIVE') { · <a [routerLink]="['/items', item.target.id]">otwórz</a> }</dd></div>
+            @if (item.target.moderationReason) {
+              <div><dt>Powód ukrycia</dt><dd class="text-block">{{ item.target.moderationReason }}</dd></div>
+            }
+          }
+          <div><dt>{{ item.target.type === 'LISTING' ? 'Właściciel' : 'Konto' }}</dt>
+            <dd>{{ item.target.user.displayName }} · {{ item.target.user.status === 'SUSPENDED' ? 'zawieszone' : 'aktywne' }}
+              @if (item.target.user.role !== 'USER') { · {{ item.target.user.role === 'ADMIN' ? 'administrator' : 'moderator' }} }</dd></div>
+          @if (item.status !== 'OPEN') {
+            <div><dt>Zamknięte</dt><dd>{{ item.moderatorName }}, {{ date(item.resolvedAt) }}</dd></div>
+            @if (item.resolutionNote) {
+              <div><dt>Notatka</dt><dd class="text-block">{{ item.resolutionNote }}</dd></div>
+            }
+          }
+        </dl>
+
+        @if (item.allowedActions.length > 0) {
+          <section class="actions" aria-labelledby="actions-title">
+            <h2 id="actions-title">Działania</h2>
+            @if (actionError()) {
+              <p class="notice-error" role="alert">{{ actionError() }}</p>
+            }
+            @if (config(); as current) {
+              <div class="confirm">
+                <div class="form-field">
+                  <label for="moderation-reason">{{ current.reasonLabel }} @if (!current.reasonRequired) { <span class="muted">(opcjonalnie)</span> }</label>
+                  <textarea id="moderation-reason" name="reason" rows="3" maxlength="500" [(ngModel)]="reason"></textarea>
+                </div>
+                <div class="button-row">
+                  <button class="button-primary" type="button" [disabled]="busy()" (click)="confirm()">{{ busy() ? 'Zapisywanie…' : current.confirmLabel }}</button>
+                  <button class="button-quiet" type="button" [disabled]="busy()" (click)="cancel()">Wróć</button>
+                </div>
+              </div>
+            } @else {
+              <div class="button-row">
+                @for (action of item.allowedActions; track action) {
+                  <button [class]="actions[action].primary ? 'button-primary' : 'button-secondary'" type="button" (click)="start(action)">
+                    {{ actions[action].label }}
+                  </button>
+                }
+              </div>
+            }
+          </section>
+        }
+      </div>
+
+      <aside class="side">
+        <section aria-labelledby="related-title">
+          <h2 id="related-title">Inne zgłoszenia tego celu</h2>
+          @if (item.relatedReports.length === 0) {
+            <p class="state-message">Brak innych zgłoszeń.</p>
+          } @else {
+            <ul class="plain-list">
+              @for (related of item.relatedReports; track related.id) {
+                <li>
+                  <a [routerLink]="['/moderation/reports', related.id]">{{ reasons[related.reason] }}</a>
+                  <span class="muted"> · {{ statuses[related.status] }} · {{ related.reporterName }} · {{ date(related.createdAt) }}</span>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+        <section aria-labelledby="history-title">
+          <h2 id="history-title">Historia działań</h2>
+          @if (item.history.length === 0) {
+            <p class="state-message">Jeszcze nic nie zrobiono.</p>
+          } @else {
+            <ol class="plain-list">
+              @for (entry of item.history; track $index) {
+                <li>
+                  <strong>{{ history[entry.action] ?? entry.action }}</strong>
+                  <span class="muted"> · {{ entry.moderatorName }} · {{ date(entry.createdAt) }}</span>
+                  @if (entry.reason) { <span class="history-reason">{{ entry.reason }}</span> }
+                </li>
+              }
+            </ol>
+          }
+        </section>
+      </aside>
+    </div>
+  }
+</section>
