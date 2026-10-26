@@ -1,0 +1,91 @@
+spring:
+  application:
+    name: lendly-api
+  config:
+    # Local development values; real environment variables take precedence. Production uses service environment variables.
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/lendly}
+    username: ${DATABASE_USERNAME:lendly}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+lendly:
+  auth:
+    jwt-secret: ${LENDLY_JWT_SECRET:}
+    issuer: ${LENDLY_JWT_ISSUER:lendly-api}
+    audience: ${LENDLY_JWT_AUDIENCE:lendly-api}
+    public-origin: ${LENDLY_PUBLIC_ORIGIN:}
+    callback-url: ${LENDLY_GOOGLE_CALLBACK_URL:}
+    google-client-id: ${GOOGLE_OIDC_CLIENT_ID:}
+    google-client-secret: ${GOOGLE_OIDC_CLIENT_SECRET:}
+    secure-cookies: ${LENDLY_SECURE_COOKIES:false}
+    demo-registration: ${LENDLY_DEMO_REGISTRATION:false}
+    demo-registration-on-https: ${LENDLY_DEMO_REGISTRATION_ON_HTTPS:false}
+    rate-limit-hmac-key: ${LENDLY_RATE_LIMIT_HMAC_KEY:}
+    allowed-origins: ${LENDLY_ALLOWED_ORIGINS:}
+    trusted-proxies: ${LENDLY_TRUSTED_PROXIES:}
+    rate-limits:
+      registration: ${LENDLY_RATE_REGISTER:5}
+      registration-window-seconds: ${LENDLY_RATE_REGISTER_WINDOW_SECONDS:3600}
+      login-ip: ${LENDLY_RATE_LOGIN_IP:10}
+      login-email: ${LENDLY_RATE_LOGIN_EMAIL:10}
+      login-wide-ip: ${LENDLY_RATE_LOGIN_WIDE_IP:60}
+      login-window-seconds: ${LENDLY_RATE_LOGIN_WINDOW_SECONDS:900}
+      refresh: ${LENDLY_RATE_REFRESH:30}
+      refresh-window-seconds: ${LENDLY_RATE_REFRESH_WINDOW_SECONDS:60}
+      google: ${LENDLY_RATE_GOOGLE:10}
+      google-window-seconds: ${LENDLY_RATE_GOOGLE_WINDOW_SECONDS:900}
+      callback: ${LENDLY_RATE_OIDC_CALLBACK:20}
+      callback-window-seconds: ${LENDLY_RATE_OIDC_CALLBACK_WINDOW_SECONDS:900}
+      link: ${LENDLY_RATE_GOOGLE_LINK:5}
+      link-window-seconds: ${LENDLY_RATE_GOOGLE_LINK_WINDOW_SECONDS:900}
+      csrf-per-client: ${LENDLY_RATE_CSRF_PER_CLIENT:20}
+      csrf-global: ${LENDLY_RATE_CSRF_GLOBAL:10000}
+      csrf-window-seconds: ${LENDLY_RATE_CSRF_WINDOW_SECONDS:60}
+      listing-create: ${LENDLY_RATE_LISTING_CREATE:20}
+      listing-create-window-seconds: ${LENDLY_RATE_LISTING_CREATE_WINDOW_SECONDS:86400}
+      image-upload: ${LENDLY_RATE_IMAGE_UPLOAD:60}
+      image-upload-window-seconds: ${LENDLY_RATE_IMAGE_UPLOAD_WINDOW_SECONDS:3600}
+      search: ${LENDLY_RATE_SEARCH:120}
+      search-window-seconds: ${LENDLY_RATE_SEARCH_WINDOW_SECONDS:60}
+      reservation-create: ${LENDLY_RATE_RESERVATION_CREATE:20}
+      reservation-create-window-seconds: ${LENDLY_RATE_RESERVATION_CREATE_WINDOW_SECONDS:86400}
+      report-create: ${LENDLY_RATE_REPORT_CREATE:10}
+      report-create-window-seconds: ${LENDLY_RATE_REPORT_CREATE_WINDOW_SECONDS:86400}
+      ai-scan: ${LENDLY_RATE_AI_SCAN:20}
+      ai-scan-window-seconds: ${LENDLY_RATE_AI_SCAN_WINDOW_SECONDS:3600}
+      mission: ${LENDLY_RATE_MISSION:30}
+      mission-window-seconds: ${LENDLY_RATE_MISSION_WINDOW_SECONDS:3600}
+  storage:
+    image-dir: ${LENDLY_IMAGE_DIR:}
+  ai:
+    # gemini or openai; each provider reads only its own key.
+    provider: ${AI_PROVIDER:gemini}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${OPENAI_MODEL:gpt-6-luna}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+server:
+  tomcat:
+    max-swallow-size: 8MB
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
