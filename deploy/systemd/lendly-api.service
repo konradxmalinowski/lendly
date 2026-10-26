@@ -1,0 +1,30 @@
+[Unit]
+Description=Lendly API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lendly
+Group=lendly
+WorkingDirectory=/opt/lendly
+EnvironmentFile=/etc/lendly/lendly-api.env
+ExecStart=/usr/bin/java -Xms256m -Xmx1g -XX:+ExitOnOutOfMemoryError -jar /opt/lendly/current/lendly-api.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+# Hardening: read-only system, writable image store only, no privilege escalation.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/lendly/images
+
+[Install]
+WantedBy=multi-user.target
