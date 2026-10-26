@@ -1,0 +1,951 @@
+openapi: 3.1.0
+info:
+  title: Lendly API
+  version: 0.1.0
+  description: Authentication, profile, catalog, listing, reservation, moderation, and AI endpoints for the same-origin browser client.
+servers:
+  - url: /
+paths:
+  /api/auth/csrf:
+    get:
+      summary: Issue a synchronizer CSRF token
+      responses:
+        '200':
+          description: Token held by the client in memory. Auth tokens are never returned here.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [csrfToken]
+                properties:
+                  csrfToken: { type: string }
+          headers:
+            Set-Cookie:
+              description: HttpOnly pre-auth context cookie when no active session is present.
+              schema: { type: string }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/auth/register:
+    post:
+      summary: Register a local/demo password account
+      description: Disabled when secure cookies are enabled and when the explicit demo-registration switch is off. Requires an allowed Origin and one-use pre-auth CSRF token.
+      security: [{ csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/AuthSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/auth/login:
+    post:
+      summary: Sign in with email and password
+      security: [{ csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AuthSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid email or password; response is identical for both cases. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/auth/refresh:
+    post:
+      summary: Rotate the current refresh token
+      description: Consumes the current refresh token atomically. Reuse revokes its session family. Response body is empty.
+      security: [{ refreshCookie: [], csrfToken: [] }]
+      responses:
+        '204': { description: Rotated. New access and refresh cookies were set. }
+        '401': { description: Session is invalid; auth cookies are cleared. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/auth/logout:
+    post:
+      summary: Revoke the current session family
+      description: Idempotently clears cookies. If a valid access or refresh session is present, only that family is revoked.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      responses:
+        '204': { description: Logged out and cookies cleared. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/auth/google:
+    post:
+      summary: Start Google OIDC sign-in
+      security: [{ csrfToken: [] }]
+      responses:
+        '200':
+          description: Authorization URL for browser navigation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authorizationUrl]
+                properties:
+                  authorizationUrl: { type: string, format: uri }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { description: Google client and secure callback configuration are unavailable. }
+  /api/auth/google/link:
+    post:
+      summary: Start explicit Google identity linking
+      security: [{ accessCookie: [], csrfToken: [] }]
+      responses:
+        '200':
+          description: Authorization URL bound to the current account and session.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authorizationUrl]
+                properties:
+                  authorizationUrl: { type: string, format: uri }
+        '401': { description: Authentication is required. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { description: Google client and secure callback configuration are unavailable. }
+  /api/auth/google/callback:
+    get:
+      summary: Complete Google OIDC authorization
+      parameters:
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        '302': { description: Redirects to a fixed local route. Provider error details are not reflected. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/me:
+    get:
+      summary: Get the authenticated user's private profile
+      security: [{ accessCookie: [] }]
+      responses:
+        '200':
+          description: Current database-backed profile and role.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivateProfile' }
+        '401': { description: Authentication is required. }
+        '403': { description: Account is suspended. }
+    patch:
+      summary: Update the authenticated user's editable profile fields
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfilePatch' }
+      responses:
+        '200':
+          description: Updated private profile.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivateProfile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Authentication is required. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/users/{id}:
+    get:
+      summary: Get a public profile projection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Profile projection excludes email, role, status, and authentication data.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicProfile' }
+        '400': { description: Invalid user ID. }
+        '404': { description: User not found. }
+  /api/categories:
+    get:
+      summary: List active categories in display order
+      responses:
+        '200':
+          description: Active categories. Publicly cacheable for 10 minutes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Category' }
+  /api/items:
+    get:
+      summary: Search active listings
+      description: Returns only ACTIVE listings of ACTIVE owners. Coordinates are the displaced public point; distance and map-area filters also use the public point.
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Free text; letters and digits become AND-ed prefix terms. }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: pricing, in: query, schema: { type: string, enum: [FREE, PAID] } }
+        - { name: minPrice, in: query, schema: { type: string, example: '10.00' }, description: Daily price in PLN; FREE counts as 0. }
+        - { name: maxPrice, in: query, schema: { type: string, example: '20.00' } }
+        - { name: bbox, in: query, schema: { type: string, example: '20.9,52.1,21.2,52.4' }, description: west,south,east,north. }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+        - { name: radiusKm, in: query, schema: { type: number, minimum: 1, maximum: 50 }, description: Required together with lat and lng. }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, price_asc, price_desc, distance], default: newest }, description: distance requires lat, lng and radiusKm. }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: One page of listing summaries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListingSummaryPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    post:
+      summary: Create a draft listing
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ListingRequest' }
+      responses:
+        '201':
+          description: Draft created. The public point is generated from the handover point when one is given.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerListing' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Authentication is required. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/items/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Get a public listing detail
+      responses:
+        '200':
+          description: ACTIVE listing with images and the owner's public profile projection. No private handover point.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListingDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Replace the editable fields of an owned listing
+      description: Full replacement of the editable field set. Changing the handover point regenerates the public point. An ACTIVE listing must keep a handover point.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ListingRequest' }
+      responses:
+        '200':
+          description: Updated listing.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerListing' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ListingIncomplete' }
+    delete:
+      summary: Archive an owned listing
+      description: Never hard-deletes. Archiving an archived listing is a no-op. Refused with 409 LISTING_HAS_RESERVATIONS while ACCEPTED or ACTIVE reservations exist; PENDING requests are rejected automatically.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      responses:
+        '204': { description: Archived. }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/items/{id}/publish:
+    post:
+      summary: Publish a draft or archived listing
+      description: Requires a handover point, at least one image, and an active category.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Listing is ACTIVE.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerListing' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ListingIncomplete' }
+  /api/items/{id}/images:
+    post:
+      summary: Upload one image to an owned listing
+      description: JPEG or PNG by file signature, at most 5 MB and 6000 px per side. The server re-encodes to JPEG (max 1600 px), which drops all metadata. At most 8 images per listing.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Stored image metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListingImage' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The listing already has 8 images. }
+        '413': { description: The file is larger than 5 MB. }
+        '422': { description: Unsupported type, unreadable image, or dimensions not allowed. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/items/{id}/images/{imageId}:
+    delete:
+      summary: Remove an image from an owned listing
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: imageId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Removed. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { description: The last image of an ACTIVE listing cannot be removed. }
+  /api/images/{imageId}:
+    get:
+      summary: Read a listing image
+      description: Public for images of ACTIVE listings (Cache-Control public, 1 hour). Otherwise only the owner can read it (no-store). Always image/jpeg with X-Content-Type-Options nosniff.
+      parameters:
+        - { name: imageId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: JPEG bytes.
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        '404': { description: Image not found or not visible to the caller. }
+  /api/me/items:
+    get:
+      summary: List the caller's listings in all statuses, including HIDDEN with the moderation reason
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: One page of owner listings, newest update first.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerListingPage' }
+        '401': { description: Authentication is required. }
+  /api/me/items/{id}:
+    get:
+      summary: Get one owned listing with its private handover point
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Owner view.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerListing' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/items/{id}/availability:
+    get:
+      summary: Busy date ranges of an active listing
+      description: Merged inclusive ranges from PENDING, ACCEPTED, and ACTIVE reservations and owner blocks. No borrower identity or status. Default window is today to 180 days ahead; at most 190 days.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Busy ranges in date order.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/DateRange' } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/reservations:
+    post:
+      summary: Request a reservation
+      description: Inclusive full days in the Europe/Warsaw calendar. Start from today to 180 days ahead, at most 30 days. At most 5 PENDING requests per borrower. Price is snapshotted. PENDING expires after 48 hours or when the start date passes.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [listingId, startDate, endDate]
+              properties:
+                listingId: { type: string, format: uuid }
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+                note: { type: [string, 'null'], maxLength: 500 }
+      responses:
+        '201':
+          description: PENDING reservation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservationDetail' }
+        '409': { description: 'DATES_UNAVAILABLE: overlaps an active reservation or owner block.' }
+        '422': { description: 'INVALID_DATES, OWN_LISTING, LISTING_UNAVAILABLE, or TOO_MANY_PENDING.' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    get:
+      summary: List the caller's reservations as borrower or as owner
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: role, in: query, schema: { type: string, enum: [borrower, owner], default: borrower } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ReservationStatus' } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Newest first; for owners PENDING requests come first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, size, totalElements, totalPages]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ReservationSummary' } }
+                  page: { type: integer }
+                  size: { type: integer }
+                  totalElements: { type: integer }
+                  totalPages: { type: integer }
+  /api/reservations/{id}:
+    get:
+      summary: Reservation detail for a participant
+      description: handoverLat and handoverLng are present only in ACCEPTED or ACTIVE. Non-participants receive 404.
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Detail with allowedActions for the caller.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservationDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/reservations/{id}/{action}:
+    post:
+      summary: Apply a state transition
+      description: 'accept (owner, PENDING), reject (owner, PENDING, optional reason), cancel (borrower PENDING/ACCEPTED; owner ACCEPTED with required reason), handover (owner, ACCEPTED, from the day before start), return (owner, ACTIVE).'
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [accept, reject, cancel, handover, return] } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: [string, 'null'], maxLength: 300 }
+      responses:
+        '200':
+          description: Updated reservation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReservationDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'INVALID_TRANSITION or DATES_UNAVAILABLE.' }
+        '422': { description: 'REASON_REQUIRED when the owner cancels without a reason.' }
+  /api/me/items/{id}/blocks:
+    get:
+      summary: Upcoming owner availability blocks
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Blocks ending today or later.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AvailabilityBlock' } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      summary: Block dates on an owned listing
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DateRange' }
+      responses:
+        '201':
+          description: Created block.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AvailabilityBlock' }
+        '409': { description: 'DATES_RESERVED or BLOCK_OVERLAP.' }
+  /api/me/items/{id}/blocks/{blockId}:
+    delete:
+      summary: Remove an owner availability block
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: blockId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Removed. }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/reports:
+    post:
+      summary: Report a listing or a user
+      description: Only public targets (ACTIVE listing of an active owner, active user). Not yourself or your own listing. One OPEN report per reporter and target. Details required for OTHER.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [targetType, targetId, reason]
+              properties:
+                targetType: { type: string, enum: [LISTING, USER] }
+                targetId: { type: string, format: uuid }
+                reason: { type: string, enum: [SCAM, DANGEROUS, INAPPROPRIATE, SPAM, OTHER] }
+                details: { type: [string, 'null'], maxLength: 1000 }
+      responses:
+        '201': { description: 'Report created: { id, status: OPEN }.' }
+        '404': { description: 'TARGET_NOT_FOUND.' }
+        '409': { description: 'REPORT_ALREADY_OPEN.' }
+        '422': { description: 'SELF_REPORT.' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/moderation/reports:
+    get:
+      summary: Moderation queue (MODERATOR, ADMIN)
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [OPEN, CLOSED], default: OPEN } }
+        - { name: targetType, in: query, schema: { type: string, enum: [LISTING, USER] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: 'Open reports oldest first; closed reports newest closure first. Items carry reporter, target summary, and open report count for the target.' }
+        '403': { description: Not a moderator or admin. }
+  /api/moderation/reports/{id}:
+    get:
+      summary: Report detail with related reports, action history, and allowedActions
+      security: [{ accessCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Report detail. }
+        '403': { description: Not a moderator or admin. }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/moderation/reports/{id}/resolve:
+    post:
+      summary: Close an open report
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [outcome]
+              properties:
+                outcome: { type: string, enum: [RESOLVED, DISMISSED] }
+                note: { type: [string, 'null'], maxLength: 500 }
+      responses:
+        '200': { description: Updated report detail. }
+        '409': { description: 'REPORT_CLOSED.' }
+  /api/moderation/listings/{id}/{action}:
+    post:
+      summary: Hide or restore a listing (MODERATOR, ADMIN)
+      description: hide requires a reason (shown to the owner) and rejects PENDING reservations; restore returns a HIDDEN listing to ACTIVE.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [hide, restore] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: [string, 'null'], maxLength: 500 }
+                reportId: { type: [string, 'null'], format: uuid }
+      responses:
+        '204': { description: Done. }
+        '400': { description: Missing reason for hide. }
+        '409': { description: 'LISTING_NOT_ACTIVE or LISTING_NOT_HIDDEN.' }
+  /api/moderation/users/{id}/{action}:
+    post:
+      summary: Suspend or reinstate an account (ADMIN only)
+      description: suspend requires a reason, revokes all sessions, and rejects PENDING requests on the user's listings. Admins cannot suspend themselves or another admin.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [suspend, reinstate] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: [string, 'null'], maxLength: 500 }
+                reportId: { type: [string, 'null'], format: uuid }
+      responses:
+        '204': { description: Done. }
+        '403': { description: Not an admin. }
+        '409': { description: 'USER_NOT_ACTIVE or USER_NOT_SUSPENDED.' }
+        '422': { description: 'CANNOT_SUSPEND_SELF or CANNOT_SUSPEND_ADMIN.' }
+  /api/ai/status:
+    get:
+      summary: Whether AI features are configured
+      responses:
+        '200': { description: '{ available: boolean } for the configured provider (AI_PROVIDER).' }
+  /api/ai/scan:
+    post:
+      summary: Suggest listing fields from one photo
+      description: The image is validated and re-encoded (metadata stripped) and sent to the configured provider; nothing is stored or published. Condition, price, and handover point are never suggested.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Validated suggestions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itemRecognized: { type: boolean }
+                  title: { type: [string, 'null'] }
+                  categoryKey: { type: [string, 'null'], description: Always a key from the category taxonomy or null. }
+                  description: { type: [string, 'null'] }
+                  keywords: { type: array, items: { type: string } }
+                  attributes: { type: array, items: { type: object, properties: { name: { type: string }, value: { type: string } } } }
+                  mustProvide: { type: array, items: { type: string }, description: Fields the owner must fill in, always including condition, pricing, handover. }
+                  note: { type: [string, 'null'] }
+        '413': { description: The file is larger than 5 MB. }
+        '422': { description: Invalid image. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { description: 'AI_UNAVAILABLE: no key configured or the provider failed.' }
+  /api/ai/missions:
+    post:
+      summary: Find real listings for a described task
+      description: The provider only turns the task into item types and search terms; listings come from PostgreSQL (ACTIVE, owner active, free in the optional dates, within the optional radius). Explanations mentioning prices, availability, offers, or identifiers are dropped. If the provider fails, returns a keyword search with aiUsed false.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [task]
+              properties:
+                task: { type: string, minLength: 10, maxLength: 500 }
+                startDate: { type: [string, 'null'], format: date }
+                endDate: { type: [string, 'null'], format: date }
+                lat: { type: [number, 'null'] }
+                lng: { type: [number, 'null'] }
+                radiusKm: { type: [number, 'null'], minimum: 1, maximum: 50 }
+      responses:
+        '200':
+          description: '{ aiUsed, summary, safetyNote, groups[{ name, essential, why, listings[ListingSummary] }], fallbackListings[ListingSummary] }'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+components:
+  securitySchemes:
+    accessCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-lendly_access
+      description: Production name. Local mode uses lendly_access. HttpOnly JWT, 10-minute lifetime.
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: __Secure-lendly_refresh
+      description: Production name. Local mode uses lendly_refresh. Opaque rotating token, maximum 30-day family lifetime.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName, email, password]
+      properties:
+        displayName: { type: string, minLength: 2, maxLength: 80 }
+        email: { type: string, format: email, minLength: 3, maxLength: 254 }
+        password: { type: string, minLength: 12, description: At most 72 UTF-8 bytes; never trimmed or truncated. }
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    ProfilePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        displayName: { type: string, minLength: 2, maxLength: 80 }
+        areaLabel: { type: [string, 'null'], minLength: 2, maxLength: 120 }
+    PrivateProfile:
+      type: object
+      required: [id, email, emailVerified, displayName, avatarUrl, areaLabel, role, status, registeredAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        emailVerified: { type: boolean }
+        displayName: { type: string }
+        avatarUrl: { type: [string, 'null'], format: uri }
+        areaLabel: { type: [string, 'null'] }
+        role: { type: string, enum: [USER, MODERATOR, ADMIN] }
+        status: { type: string, enum: [ACTIVE, SUSPENDED] }
+        registeredAt: { type: string, format: date-time }
+    PublicProfile:
+      type: object
+      required: [id, displayName, avatarUrl, areaLabel, registeredAt]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        avatarUrl: { type: [string, 'null'], format: uri }
+        areaLabel: { type: [string, 'null'] }
+        registeredAt: { type: string, format: date-time }
+    Category:
+      type: object
+      required: [key, displayName]
+      properties:
+        key: { type: string }
+        displayName: { type: string }
+    ListingRequest:
+      type: object
+      additionalProperties: false
+      required: [title, description, categoryKey, condition, pricingType]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 100 }
+        description: { type: string, minLength: 10, maxLength: 2000 }
+        categoryKey: { type: string }
+        condition: { type: string, enum: [NEW, VERY_GOOD, GOOD, FAIR] }
+        pricingType: { type: string, enum: [FREE, PAID] }
+        dailyPrice: { type: [string, number, 'null'], description: 'Required for PAID: 0.01 to 9999.99 PLN, two decimals. Ignored for FREE.' }
+        handoverLat: { type: [number, 'null'], minimum: -90, maximum: 90 }
+        handoverLng: { type: [number, 'null'], minimum: -180, maximum: 180 }
+    ListingImage:
+      type: object
+      required: [id, url, width, height]
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string, example: /api/images/3f0c... }
+        width: { type: integer }
+        height: { type: integer }
+    ListingSummary:
+      type: object
+      required: [id, title, categoryKey, condition, pricingType, dailyPrice, currency, coverImageUrl, lat, lng, ownerDisplayName, areaLabel, distanceKm, publishedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        categoryKey: { type: string }
+        condition: { type: string, enum: [NEW, VERY_GOOD, GOOD, FAIR] }
+        pricingType: { type: string, enum: [FREE, PAID] }
+        dailyPrice: { type: [number, 'null'] }
+        currency: { type: string, enum: [PLN] }
+        coverImageUrl: { type: [string, 'null'] }
+        lat: { type: number, description: Public point, displaced 300 to 600 m from the private handover point. }
+        lng: { type: number }
+        ownerDisplayName: { type: string }
+        areaLabel: { type: [string, 'null'] }
+        distanceKm: { type: [number, 'null'], description: From the public point; present only when lat, lng and radiusKm were given. }
+        publishedAt: { type: string, format: date-time }
+    ListingSummaryPage:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ListingSummary' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+    ListingDetail:
+      type: object
+      required: [id, title, description, categoryKey, condition, pricingType, dailyPrice, currency, lat, lng, images, owner, publishedAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        categoryKey: { type: string }
+        condition: { type: string, enum: [NEW, VERY_GOOD, GOOD, FAIR] }
+        pricingType: { type: string, enum: [FREE, PAID] }
+        dailyPrice: { type: [number, 'null'] }
+        currency: { type: string, enum: [PLN] }
+        lat: { type: number, description: Public point only. }
+        lng: { type: number }
+        images: { type: array, items: { $ref: '#/components/schemas/ListingImage' } }
+        owner: { $ref: '#/components/schemas/PublicProfile' }
+        publishedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OwnerListing:
+      type: object
+      description: Owner-only view. The only response that contains the private handover point.
+      required: [id, title, description, categoryKey, condition, pricingType, dailyPrice, currency, handoverLat, handoverLng, publicLat, publicLng, status, images, createdAt, updatedAt, publishedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        categoryKey: { type: string }
+        condition: { type: string, enum: [NEW, VERY_GOOD, GOOD, FAIR] }
+        pricingType: { type: string, enum: [FREE, PAID] }
+        dailyPrice: { type: [number, 'null'] }
+        currency: { type: string, enum: [PLN] }
+        handoverLat: { type: [number, 'null'] }
+        handoverLng: { type: [number, 'null'] }
+        publicLat: { type: [number, 'null'] }
+        publicLng: { type: [number, 'null'] }
+        status: { type: string, enum: [DRAFT, ACTIVE, ARCHIVED, HIDDEN] }
+        images: { type: array, items: { $ref: '#/components/schemas/ListingImage' } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        publishedAt: { type: [string, 'null'], format: date-time }
+        moderationReason: { type: [string, 'null'], description: Set while the listing is HIDDEN by moderation. }
+    OwnerListingPage:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/OwnerListing' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+    ReservationStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED, CANCELLED, EXPIRED, ACTIVE, COMPLETED]
+    DateRange:
+      type: object
+      required: [startDate, endDate]
+      properties:
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date, description: Inclusive. }
+    AvailabilityBlock:
+      type: object
+      required: [id, startDate, endDate]
+      properties:
+        id: { type: string, format: uuid }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+    ReservationSummary:
+      type: object
+      required: [id, role, status, startDate, endDate, days, pricingType, estimatedCost, currency, listing, counterpart, expiresAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        role: { type: string, enum: [BORROWER, OWNER] }
+        status: { $ref: '#/components/schemas/ReservationStatus' }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        days: { type: integer }
+        pricingType: { type: string, enum: [FREE, PAID] }
+        estimatedCost: { type: number, description: Days times the daily price snapshot; 0 for FREE. }
+        currency: { type: string, enum: [PLN] }
+        listing:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            title: { type: string }
+            coverImageUrl: { type: [string, 'null'] }
+            status: { type: string }
+        counterpart:
+          type: object
+          description: The other participant's public name and area only.
+          properties:
+            id: { type: string, format: uuid }
+            displayName: { type: string }
+            areaLabel: { type: [string, 'null'] }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    ReservationDetail:
+      allOf:
+        - { $ref: '#/components/schemas/ReservationSummary' }
+        - type: object
+          properties:
+            dailyPrice: { type: [number, 'null'] }
+            note: { type: [string, 'null'] }
+            decisionReason: { type: [string, 'null'] }
+            cancelledBy: { type: [string, 'null'], enum: [BORROWER, OWNER, null] }
+            approximateLat: { type: [number, 'null'] }
+            approximateLng: { type: [number, 'null'] }
+            handoverLat: { type: [number, 'null'], description: Only in ACCEPTED or ACTIVE. }
+            handoverLng: { type: [number, 'null'] }
+            allowedActions: { type: array, items: { type: string, enum: [ACCEPT, REJECT, CANCEL, HANDOVER, RETURN] } }
+            decidedAt: { type: [string, 'null'], format: date-time }
+            handedOverAt: { type: [string, 'null'], format: date-time }
+            returnedAt: { type: [string, 'null'], format: date-time }
+            cancelledAt: { type: [string, 'null'], format: date-time }
+    Error:
+      type: object
+      required: [code, message, fieldErrors, correlationId]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        fieldErrors: { type: [object, 'null'], additionalProperties: { type: array, items: { type: string } } }
+        correlationId: { type: string }
+  responses:
+    AuthSuccess:
+      description: Account authenticated; private profile and CSRF token returned, tokens set only as HttpOnly cookies.
+      headers:
+        Set-Cookie: { schema: { type: string } }
+        Cache-Control: { schema: { type: string, example: no-store } }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [user, csrfToken]
+            properties:
+              user: { $ref: '#/components/schemas/PrivateProfile' }
+              csrfToken: { type: string }
+    BadRequest:
+      description: Invalid fields, empty patch, or immutable field attempt.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Origin, CSRF, registration, or account-status restriction.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Email is already registered.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Configured limit exceeded. Includes Retry-After seconds.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not found, or not visible to the caller. Other users' drafts and archived listings are reported the same way.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ListingIncomplete:
+      description: 'LISTING_INCOMPLETE: fieldErrors names what publishing still needs (handoverLat, images, categoryKey).'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
