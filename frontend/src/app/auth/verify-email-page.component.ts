@@ -32,7 +32,13 @@ const RESEND_WINDOW_SECONDS = 60;
       </div>
 
       <div class="auth-panel">
-        @if (errorMessage()) {
+        @if (locked()) {
+          <p class="form-error-summary" id="code-locked" role="alert">
+            Weryfikacja tego konta jest zablokowana po zbyt wielu błędnych kodach. Odblokować ją może tylko obsługa Lendly.
+            Możesz się wylogować.
+          </p>
+        }
+        @if (errorMessage() && !locked()) {
           <p class="form-error-summary" id="code-summary" role="alert">{{ errorMessage() }}</p>
         }
         @if (successMessage()) {
@@ -51,6 +57,7 @@ const RESEND_WINDOW_SECONDS = 60;
               enterkeyhint="done"
               autocapitalize="off"
               spellcheck="false"
+              [disabled]="locked()"
               [value]="code()"
               (input)="onCodeInput($event)"
               [attr.aria-invalid]="fieldError() || errorMessage() ? true : null"
@@ -64,16 +71,18 @@ const RESEND_WINDOW_SECONDS = 60;
             }
           </div>
 
-          <button class="button-primary" type="submit" [disabled]="busy() || attemptsLeft() === 0">
+          <button class="button-primary" type="submit" [disabled]="busy() || locked() || attemptsLeft() === 0">
             {{ verifying() ? 'Sprawdzanie…' : 'Potwierdź adres' }}
           </button>
         </form>
 
         <div class="resend-block">
-          <button class="button-secondary" type="button" [disabled]="busy() || cooldown() > 0" (click)="resend()">
+          <button class="button-secondary" type="button" [disabled]="busy() || locked() || cooldown() > 0" (click)="resend()">
             {{ resending() ? 'Wysyłanie…' : 'Wyślij kod ponownie' }}
           </button>
-          @if (cooldown() > 0) {
+          @if (locked()) {
+            <p class="field-hint">Wysyłanie kodów jest wyłączone.</p>
+          } @else if (cooldown() > 0) {
             <p class="field-hint">Kolejny kod możesz wysłać za {{ countdown() }}.</p>
           } @else {
             <p class="field-hint">Nie widzisz wiadomości? Sprawdź spam albo wyślij kod ponownie.</p>
@@ -107,6 +116,7 @@ export class VerifyEmailPageComponent {
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
   readonly fieldError = signal('');
+  readonly locked = signal(false);
   readonly attemptsLeft = signal<number | null>(null);
   readonly readyAnnouncement = signal('');
 
@@ -212,6 +222,10 @@ export class VerifyEmailPageComponent {
 
   private handleVerifyError(error: unknown): void {
     const code = apiErrorCode(error);
+    if (code === 'VERIFICATION_LOCKED') {
+      this.lockAccount();
+      return;
+    }
     if (code === 'EMAIL_ALREADY_VERIFIED') {
       this.auth.refreshProfile().subscribe({ error: () => this.errorMessage.set(authenticationMessage(error, 'login')) });
       return;
@@ -229,6 +243,10 @@ export class VerifyEmailPageComponent {
 
   private handleResendError(error: unknown): void {
     const code = apiErrorCode(error);
+    if (code === 'VERIFICATION_LOCKED') {
+      this.lockAccount();
+      return;
+    }
     if (code === 'EMAIL_ALREADY_VERIFIED') {
       this.auth.refreshProfile().subscribe({ error: () => this.errorMessage.set(authenticationMessage(error, 'login')) });
       return;
@@ -242,6 +260,15 @@ export class VerifyEmailPageComponent {
       return;
     }
     this.errorMessage.set(authenticationMessage(error, 'login'));
+  }
+
+  private lockAccount(): void {
+    this.locked.set(true);
+    this.errorMessage.set('');
+    this.successMessage.set('');
+    this.fieldError.set('');
+    this.stopTimer();
+    this.resendAt.set(0);
   }
 
   private startCooldown(seconds: number): void {

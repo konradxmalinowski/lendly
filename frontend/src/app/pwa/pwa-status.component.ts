@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate } from '@angular/service-worker';
 import { filter } from 'rxjs';
@@ -45,6 +45,7 @@ export class PwaStatusComponent {
   private readonly document = inject(DOCUMENT);
   private readonly updates = inject(SwUpdate);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly online = signal(true);
   readonly updateReady = signal(false);
@@ -71,6 +72,8 @@ export class PwaStatusComponent {
       });
     }
 
+    this.reserveSpace(view);
+
     if (this.updates.isEnabled) {
       this.updates.versionUpdates.pipe(
         filter((event) => event.type === 'VERSION_READY'),
@@ -78,6 +81,24 @@ export class PwaStatusComponent {
       ).subscribe(() => this.updateReady.set(true));
       this.updates.unrecoverable.pipe(takeUntilDestroyed()).subscribe(() => this.broken.set(true));
     }
+  }
+
+  // The cards are fixed, so the page gets matching bottom padding (via --pwa-offset on body) while any card is shown.
+  private reserveSpace(view: Window | null): void {
+    if (!view || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const root = this.document.documentElement;
+    const observer = new ResizeObserver(() => {
+      const height = this.host.nativeElement.getBoundingClientRect().height;
+      const bottom = Number.parseFloat(view.getComputedStyle(this.host.nativeElement).bottom) || 0;
+      root.style.setProperty('--pwa-offset', height > 0 ? `${Math.ceil(height + bottom + 8)}px` : '0px');
+    });
+    observer.observe(this.host.nativeElement);
+    this.destroyRef.onDestroy(() => {
+      observer.disconnect();
+      root.style.removeProperty('--pwa-offset');
+    });
   }
 
   applyUpdate(): void {
