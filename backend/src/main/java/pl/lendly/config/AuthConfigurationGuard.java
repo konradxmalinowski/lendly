@@ -84,6 +84,19 @@ public class AuthConfigurationGuard implements ApplicationRunner {
         } else if (!localProfile) {
             throw new IllegalStateException("MFA requires LENDLY_MFA_ENCRYPTION_KEY outside the local profile.");
         }
+        String previousKey = properties.getMfaEncryptionKeyPrevious();
+        if (!previousKey.isBlank()) {
+            if (properties.getMfaEncryptionKey().isBlank()) {
+                throw new IllegalStateException("LENDLY_MFA_ENCRYPTION_KEY_PREVIOUS requires LENDLY_MFA_ENCRYPTION_KEY.");
+            }
+            try { MfaEncryptionKey.decode(previousKey); }
+            catch (IllegalArgumentException exception) {
+                throw new IllegalStateException("Previous MFA encryption key must be canonical Base64 encoding exactly 32 random bytes.");
+            }
+            if (previousKey.equals(properties.getMfaEncryptionKey()) || previousKey.equals(properties.getJwtSecret())) {
+                throw new IllegalStateException("Previous MFA encryption key must differ from the current MFA key and the JWT signing key.");
+            }
+        }
         if (!mail.host().isBlank() && mail.from().isBlank()) {
             throw new IllegalStateException("LENDLY_MAIL_FROM is required when MAIL_HOST is set.");
         }

@@ -19,6 +19,7 @@ public class AuthProperties {
     private boolean demoRegistrationOnHttps = false;
     private boolean registrationEnabled = false;
     private String mfaEncryptionKey = "";
+    private String mfaEncryptionKeyPrevious = "";
     private String rateLimitHmacKey = "";
     private final List<String> trustedProxies = new ArrayList<>();
     private final List<String> allowedOrigins = new ArrayList<>();
@@ -55,6 +56,8 @@ public class AuthProperties {
     }
     public String getMfaEncryptionKey() { return mfaEncryptionKey; }
     public void setMfaEncryptionKey(String value) { this.mfaEncryptionKey = value; }
+    public String getMfaEncryptionKeyPrevious() { return mfaEncryptionKeyPrevious; }
+    public void setMfaEncryptionKeyPrevious(String value) { this.mfaEncryptionKeyPrevious = value; }
     public boolean googleConfigured() {
         return !googleClientId.isBlank() && !googleClientSecret.isBlank() && !callbackUrl.isBlank() && secureCookies;
     }

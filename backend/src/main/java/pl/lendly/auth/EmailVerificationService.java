@@ -28,6 +28,8 @@ public class EmailVerificationService {
     private static final int VALID_MINUTES = 15;
     private static final int COOLDOWN_SECONDS = 60;
     private static final int MAX_ATTEMPTS = 5;
+    // Wrong codes over the whole life of the account, which resend does not reset; an operator clears it.
+    private static final int MAX_LIFETIME_FAILURES = 20;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final AuthProperties properties;
@@ -62,6 +64,7 @@ public class EmailVerificationService {
         if (!mail.available()) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "MAIL_UNAVAILABLE", "Email delivery is not available.");
         }
+        if (lifetimeFailures(user.id()) >= MAX_LIFETIME_FAILURES) throw lifetimeExceeded();
         long wait = cooldownRemaining(user.id());
         if (wait > 0) throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "Too many requests.", wait);
         limiter.emailResend(user.id());
@@ -95,6 +98,11 @@ public class EmailVerificationService {
         return wait;
     }
 
+    private int lifetimeFailures(UUID userId) {
+        Integer failures = jdbc.queryForObject("SELECT verification_failures FROM users WHERE id = ?", Integer.class, userId);
+        return failures == null ? 0 : failures;
+    }
+
     public void verify(AuthPrincipal principal, String input) {
         UUID userId = principal.user().id();
         if (principal.user().emailVerified()) throw alreadyVerified();
@@ -107,6 +115,7 @@ public class EmailVerificationService {
             case ALREADY_VERIFIED -> throw alreadyVerified();
             case EXPIRED -> throw new ApiException(HttpStatus.GONE, "VERIFICATION_CODE_EXPIRED",
                     "The code has expired. Request a new one.");
+            case LOCKED -> throw lifetimeExceeded();
             case EXCEEDED -> throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "VERIFICATION_ATTEMPTS_EXCEEDED",
                     "Too many wrong codes. Request a new one.");
             default -> throw new ApiException(HttpStatus.BAD_REQUEST, "VERIFICATION_CODE_INVALID",
@@ -117,6 +126,10 @@ public class EmailVerificationService {
 
     // Wrong guesses are counted and committed here, so this must return an outcome instead of throwing.
     private Outcome check(UUID userId, String code) {
+        // Locks the user row first, so concurrent guesses serialise on the lifetime counter too.
+        Integer lifetime = jdbc.query("SELECT verification_failures FROM users WHERE id = ? FOR UPDATE",
+                (rs, row) -> rs.getInt(1), userId).stream().findFirst().orElse(0);
+        if (lifetime >= MAX_LIFETIME_FAILURES) return new Outcome(Kind.LOCKED, 0);
         var rows = jdbc.query("""
                 SELECT code_hmac, expires_at > CURRENT_TIMESTAMP AS live, attempts
                 FROM email_verification_codes WHERE user_id = ? FOR UPDATE
@@ -135,6 +148,7 @@ public class EmailVerificationService {
             return new Outcome(Kind.OK, 0);
         }
         jdbc.update("UPDATE email_verification_codes SET attempts = attempts + 1 WHERE user_id = ?", userId);
+        jdbc.update("UPDATE users SET verification_failures = verification_failures + 1 WHERE id = ?", userId);
         return new Outcome(Kind.INVALID, MAX_ATTEMPTS - row.attempts - 1);
     }
 
@@ -160,11 +174,16 @@ public class EmailVerificationService {
         }
     }
 
+    private ApiException lifetimeExceeded() {
+        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, "VERIFICATION_LOCKED",
+                "Too many wrong codes for this account. Contact support.");
+    }
+
     private ApiException alreadyVerified() {
         return new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_VERIFIED", "The email address is already verified.");
     }
 
-    private enum Kind { OK, INVALID, EXPIRED, EXCEEDED, ALREADY_VERIFIED }
+    private enum Kind { OK, INVALID, EXPIRED, EXCEEDED, LOCKED, ALREADY_VERIFIED }
     private record Outcome(Kind kind, int attemptsRemaining) {}
     private record Row(byte[] hmac, boolean live, int attempts) {}
 }

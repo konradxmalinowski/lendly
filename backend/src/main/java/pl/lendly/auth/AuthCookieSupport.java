@@ -18,8 +18,8 @@ public class AuthCookieSupport {
 
     public String accessName() { return properties.isSecureCookies() ? "__Host-lendly_access" : "lendly_access"; }
     public String refreshName() { return properties.isSecureCookies() ? "__Secure-lendly_refresh" : "lendly_refresh"; }
-    // __Secure- rather than __Host-: the challenge is scoped to /api/auth, and __Host- cookies must use Path=/.
-    public String mfaName() { return properties.isSecureCookies() ? "__Secure-lendly_mfa" : "lendly_mfa"; }
+    // __Host- needs Path=/, so a sibling subdomain cannot plant a challenge; the cookie is HttpOnly and lives 5 minutes.
+    public String mfaName() { return properties.isSecureCookies() ? "__Host-lendly_mfa" : "lendly_mfa"; }
     public String csrfName() { return properties.isSecureCookies() ? "__Host-lendly_csrf_context" : "lendly_csrf_context"; }
 
     public String read(HttpServletRequest request, String name) {
@@ -39,7 +39,7 @@ public class AuthCookieSupport {
         set(response, csrfName(), value, "/", maxAge, true);
     }
     public void setMfaChallenge(HttpServletResponse response, String value, Duration maxAge) {
-        set(response, mfaName(), value, "/api/auth", maxAge, true);
+        set(response, mfaName(), value, "/", maxAge, true);
     }
     public void clearMfaChallenge(HttpServletResponse response) { setMfaChallenge(response, "", Duration.ZERO); }
     public void clearAuth(HttpServletResponse response) {

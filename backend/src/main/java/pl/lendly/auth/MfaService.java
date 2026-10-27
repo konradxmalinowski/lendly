@@ -9,7 +9,6 @@ import pl.lendly.common.api.ApiException;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -240,20 +239,29 @@ public class MfaService {
 
     private boolean matchAny(UUID userId, MfaRow row, String code) {
         if (code.length() == 6) return matchTotp(userId, row, code);
-        return code.length() == 8 && code.chars().allMatch(c -> RECOVERY_ALPHABET.indexOf(c) >= 0)
-                && jdbc.update("""
-                UPDATE mfa_recovery_codes SET used_at = CURRENT_TIMESTAMP
-                WHERE user_id = ? AND code_hash = ? AND used_at IS NULL
-                """, userId, recoveryHash(userId, code)) == 1;
+        if (code.length() != 8 || !code.chars().allMatch(c -> RECOVERY_ALPHABET.indexOf(c) >= 0)) return false;
+        for (byte[] hash : crypto.recoveryHashCandidates(userId, code)) {
+            if (jdbc.update("""
+                    UPDATE mfa_recovery_codes SET used_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ? AND code_hash = ? AND used_at IS NULL
+                    """, userId, hash) == 1) return true;
+        }
+        return false;
     }
 
     /** Accepts a code from the +/-1 step window and records the step, so the same code cannot be replayed. */
     private boolean matchTotp(UUID userId, MfaRow row, String code) {
         if (code.length() != 6 || !code.chars().allMatch(Character::isDigit)) return false;
-        byte[] secret = crypto.decrypt(userId, row.ciphertext);
+        MfaCrypto.Decrypted decrypted = crypto.decrypt(userId, row.ciphertext);
+        byte[] secret = decrypted.plain();
         long step;
-        try { step = Totp.match(secret, code, Totp.currentStep(), row.lastUsedStep); }
-        finally { Arrays.fill(secret, (byte) 0); }
+        try {
+            step = Totp.match(secret, code, Totp.currentStep(), row.lastUsedStep);
+            // Moves legacy and previous-key blobs onto the current key once the user proves they work.
+            if (step >= 0 && decrypted.rewrap()) {
+                jdbc.update("UPDATE user_mfa SET secret_ciphertext = ? WHERE user_id = ?", crypto.encrypt(userId, secret), userId);
+            }
+        } finally { Arrays.fill(secret, (byte) 0); }
         if (step < 0) return false;
         jdbc.update("UPDATE user_mfa SET last_used_step = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?", step, userId);
         return true;
@@ -270,20 +278,11 @@ public class MfaService {
         List<Object[]> rows = new ArrayList<>();
         List<String> display = new ArrayList<>();
         for (String code : plain) {
-            rows.add(new Object[]{userId, recoveryHash(userId, code)});
+            rows.add(new Object[]{userId, crypto.recoveryHash(userId, code)});
             display.add(code.substring(0, 4) + "-" + code.substring(4));
         }
         jdbc.batchUpdate("INSERT INTO mfa_recovery_codes (user_id, code_hash) VALUES (?, ?)", rows);
         return display;
-    }
-
-    private byte[] recoveryHash(UUID userId, String normalized) {
-        try {
-            return MessageDigest.getInstance("SHA-256")
-                    .digest(("lendly:recovery:" + userId + ":" + normalized).getBytes(StandardCharsets.UTF_8));
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(exception);
-        }
     }
 
     /** Drops spaces and dashes and lowercases, so pasted codes and "abcd-efgh" both work. */
