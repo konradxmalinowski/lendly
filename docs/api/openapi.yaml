@@ -63,7 +63,7 @@ paths:
       summary: Sign in with email and password
       description: >-
         When the account has MFA enabled, no session is created. The API answers 202 and sets the MFA challenge cookie
-        (Path=/api/auth, 5 minutes); the client then calls /api/auth/mfa/verify.
+        (Path=/, 5 minutes); the client then calls /api/auth/mfa/verify.
       security: [{ csrfToken: [] }]
       requestBody:
         required: true
@@ -76,7 +76,7 @@ paths:
           description: Password accepted, second factor required. No access or refresh cookie is set.
           headers:
             Set-Cookie:
-              description: HttpOnly MFA challenge cookie, __Secure-lendly_mfa in production and lendly_mfa locally.
+              description: HttpOnly MFA challenge cookie, __Host-lendly_mfa in production and lendly_mfa locally.
               schema: { type: string }
             Cache-Control: { schema: { type: string, example: no-store } }
           content:
@@ -139,7 +139,7 @@ paths:
         '409': { description: 'EMAIL_ALREADY_VERIFIED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '410': { description: 'VERIFICATION_CODE_EXPIRED: the code expired or none was issued. Request a new one.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429':
-          description: 'VERIFICATION_ATTEMPTS_EXCEEDED (5 wrong codes; request a new code) or RATE_LIMITED (Retry-After is set).'
+          description: 'VERIFICATION_ATTEMPTS_EXCEEDED (5 wrong codes; request a new code), VERIFICATION_LOCKED (20 wrong codes over the account lifetime; only an operator reset clears it), or RATE_LIMITED (Retry-After is set).'
           headers:
             Retry-After: { schema: { type: integer } }
           content:
@@ -148,14 +148,14 @@ paths:
   /api/auth/email/resend:
     post:
       summary: Send a new verification code
-      description: Replaces any earlier code and resets its attempts. At most one code every 60 seconds per user, plus an hourly cap.
+      description: Replaces any earlier code and resets its attempts. At most one code every 60 seconds per user, plus an hourly cap. After 20 lifetime wrong codes the account is locked (VERIFICATION_LOCKED).
       security: [{ accessCookie: [], csrfToken: [] }]
       responses:
         '204': { description: A new code was sent. }
         '401': { description: Authentication is required. }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { description: 'EMAIL_ALREADY_VERIFIED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '429': { description: 'RATE_LIMITED (Retry-After is set) or VERIFICATION_LOCKED (20 lifetime wrong codes; only an operator reset clears it).', headers: { Retry-After: { schema: { type: integer } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: 'MAIL_UNAVAILABLE: no mail transport, or delivery failed (the cooldown is released so the user can retry).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /api/auth/refresh:
     post:
@@ -166,7 +166,7 @@ paths:
         '204': { description: Rotated. New access and refresh cookies were set. }
         '401': { description: Session is invalid; auth cookies are cleared. }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '429': { description: 'RATE_LIMITED (Retry-After is set) or VERIFICATION_LOCKED (20 lifetime wrong codes; only an operator reset clears it).', headers: { Retry-After: { schema: { type: integer } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /api/auth/logout:
     post:
       summary: Revoke the current session family
@@ -190,7 +190,7 @@ paths:
                 properties:
                   authorizationUrl: { type: string, format: uri }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '429': { description: 'RATE_LIMITED (Retry-After is set) or VERIFICATION_LOCKED (20 lifetime wrong codes; only an operator reset clears it).', headers: { Retry-After: { schema: { type: integer } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: Google client and secure callback configuration are unavailable. }
   /api/auth/google/link:
     post:
@@ -208,7 +208,7 @@ paths:
                   authorizationUrl: { type: string, format: uri }
         '401': { description: Authentication is required. }
         '403': { description: 'EMAIL_NOT_VERIFIED: linking needs a verified email. Also the standard 403 cases.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '429': { description: 'RATE_LIMITED (Retry-After is set) or VERIFICATION_LOCKED (20 lifetime wrong codes; only an operator reset clears it).', headers: { Retry-After: { schema: { type: integer } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: Google client and secure callback configuration are unavailable. }
   /api/auth/google/callback:
     get:
@@ -219,7 +219,7 @@ paths:
         - { name: error, in: query, schema: { type: string } }
       responses:
         '302': { description: 'Redirects to a fixed local route. Provider error details are not reflected. With MFA on, a challenge cookie is set and the redirect goes to /login/mfa. A local account with the same email is linked (verified account) or taken over (unverified account) automatically only when the Google email is @gmail.com or the ID token hd claim equals the email domain; otherwise the redirect is /login?auth=link-required and the user links from the profile after a password sign-in. A takeover removes the password, revokes sessions, and deletes every Google identity, MFA secret, recovery code, and challenge the account held.' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '429': { description: 'RATE_LIMITED (Retry-After is set) or VERIFICATION_LOCKED (20 lifetime wrong codes; only an operator reset clears it).', headers: { Retry-After: { schema: { type: integer } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /api/me:
     get:
       summary: Get the authenticated user's private profile
@@ -896,8 +896,8 @@ components:
     mfaChallengeCookie:
       type: apiKey
       in: cookie
-      name: __Secure-lendly_mfa
-      description: Production name. Local mode uses lendly_mfa. HttpOnly, Path=/api/auth, 5-minute single-use challenge token.
+      name: __Host-lendly_mfa
+      description: Production name. Local mode uses lendly_mfa. HttpOnly, Path=/, 5-minute single-use challenge token.
   schemas:
     Health:
       type: object

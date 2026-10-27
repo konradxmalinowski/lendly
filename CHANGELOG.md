@@ -15,7 +15,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - Installable web app (PWA): manifest, icons, and an Angular service worker that caches the app shell only, never `/api`. The app shows an offline notice and a prompt when a new version is ready.
 - Open-source files: Apache-2.0 `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `.editorconfig`, the public environment variable reference in `docs/configuration.md`, and this changelog.
 - Environment variables: `LENDLY_REGISTRATION_ENABLED`, `LENDLY_MFA_ENCRYPTION_KEY`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `LENDLY_MAIL_FROM`, and rate limits for email verification and MFA.
-- Flyway migration `V6` adds the verification, MFA, recovery code, and MFA challenge tables.
+- Flyway migrations `V6` (verification, MFA, recovery code, and MFA challenge tables) and `V7` (email verification failure counter).
 
 ### Changed
 
@@ -33,6 +33,9 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - Wrong MFA codes lock the user durably: the 5th consecutive miss locks for 15 minutes, each further 5 doubles it up to 24 hours, and a correct code resets it (`429 MFA_LOCKED` with `Retry-After`).
 - Google auto-link and takeover apply only to `@gmail.com` addresses or when the ID token `hd` claim equals the email domain; other domains link from the profile. A takeover also deletes the account's earlier Google identities and MFA data. Explicit Google linking needs a verified email (`403 EMAIL_NOT_VERIFIED`).
 - The API refuses to start if `LENDLY_MFA_ENCRYPTION_KEY` equals the JWT secret.
+- MFA key rotation without resetting users: set the old key as `LENDLY_MFA_ENCRYPTION_KEY_PREVIOUS`. Stored secrets carry a key id and move to the new key on the next successful TOTP check. Recovery code hashes are now HMACs under a key derived from the MFA key; older codes still work until regenerated.
+- Email verification locks after 20 wrong codes over the account's lifetime (`429 VERIFICATION_LOCKED`, cleared by an operator). Migration `V7` adds the counter.
+- The MFA challenge cookie is now `__Host-lendly_mfa` with `Path=/` (local name `lendly_mfa`).
 - Verification codes are stored only as an HMAC, and failed attempts are counted in the same transaction as the check.
 - Someone who registers an address they do not own can no longer keep it: the verified Google owner takes over the unverified account.
 

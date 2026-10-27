@@ -42,7 +42,8 @@ The `local` profile allows non-secure cookies on an HTTP loopback origin, the ma
 
 | Variable | Default | Notes |
 |---|---|---|
-| `LENDLY_MFA_ENCRYPTION_KEY` | empty | Canonical standard Base64 of exactly 32 random bytes (`openssl rand -base64 32`). Encrypts TOTP secrets. Startup fails outside the `local` profile when it is missing, and in any profile when it equals `LENDLY_JWT_SECRET`. In the `local` profile MFA stays unavailable while it is empty. Do not rotate it without resetting MFA for affected users. |
+| `LENDLY_MFA_ENCRYPTION_KEY_PREVIOUS` | empty | Optional, only during key rotation. The key that was current before; secrets and recovery codes made under it keep working until users sign in with a TOTP code and regenerate recovery codes. Same format as the current key, and different from it and from the JWT secret. Setting it without the current key fails startup. Remove it after the rotation. |
+| `LENDLY_MFA_ENCRYPTION_KEY` | empty | Canonical standard Base64 of exactly 32 random bytes (`openssl rand -base64 32`). Encrypts TOTP secrets. Startup fails outside the `local` profile when it is missing, and in any profile when it equals `LENDLY_JWT_SECRET`. In the `local` profile MFA stays unavailable while it is empty. To rotate it, use `LENDLY_MFA_ENCRYPTION_KEY_PREVIOUS`. |
 
 ## Mail
 
