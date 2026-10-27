@@ -61,6 +61,28 @@ public class AuthRepository {
                 WHERE id = ? AND email = ?
                 """, userId, verifiedEmail);
     }
+    /** Locks the row and returns the user as it is now, or empty when it no longer exists. */
+    public Optional<AuthUser> lockById(UUID id) {
+        return jdbc.query("SELECT * FROM users WHERE id = ? FOR UPDATE", USER, id).stream().findFirst();
+    }
+    /** Hands an unverified local account to the verified Google owner: no password, no live sessions or codes. */
+    public void takeOverUnverified(UUID userId, String subject, String verifiedEmail) {
+        jdbc.update("UPDATE users SET password_hash = NULL, email_verified = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?", userId);
+        jdbc.update("""
+                UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND revoked_at IS NULL
+                """, userId);
+        jdbc.update("DELETE FROM email_verification_codes WHERE user_id = ?", userId);
+        // Anything the squatter attached must go, or it outlives the takeover.
+        jdbc.update("DELETE FROM oauth_identities WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM mfa_challenges WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM mfa_recovery_codes WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM user_mfa WHERE user_id = ?", userId);
+        jdbc.update("""
+                INSERT INTO oauth_identities (user_id, provider, provider_subject, provider_email, provider_email_verified)
+                VALUES (?, 'GOOGLE', ?, ?, TRUE)
+                """, userId, subject, verifiedEmail);
+    }
     public void markEmailVerified(UUID userId) {
         jdbc.update("UPDATE users SET email_verified = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?", userId);
     }

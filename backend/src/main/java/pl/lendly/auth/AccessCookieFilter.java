@@ -69,7 +69,7 @@ public class AccessCookieFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/users/") || "/api/categories".equals(path) || "/api/items".equals(path)
                 || path.startsWith("/api/items/") || path.startsWith("/api/images/") || "/api/ai/status".equals(path))) return false;
         if ("POST".equals(method) && Set.of("/api/auth/register", "/api/auth/login", "/api/auth/refresh",
-                "/api/auth/logout", "/api/auth/google").contains(path)) return false;
+                "/api/auth/logout", "/api/auth/google", "/api/auth/mfa/verify").contains(path)) return false;
         return !"GET".equals(method) || !"/api/auth/google/callback".equals(path);
     }
 }

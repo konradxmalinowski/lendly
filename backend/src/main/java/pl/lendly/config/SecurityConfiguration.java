@@ -13,12 +13,13 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import pl.lendly.auth.AccessCookieFilter;
+import pl.lendly.auth.AccountGateFilter;
 import pl.lendly.auth.CsrfProtectionFilter;
 import pl.lendly.common.api.CorrelationIdFilter;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({AuthProperties.class, RateLimitProperties.class, StorageProperties.class, AiProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, RateLimitProperties.class, StorageProperties.class, AiProperties.class, MailProperties.class})
 public class SecurityConfiguration {
     @Bean
     FilterRegistrationBean<CorrelationIdFilter> correlationIdFilterRegistration(CorrelationIdFilter filter) {
@@ -42,8 +43,16 @@ public class SecurityConfiguration {
     }
 
     @Bean
+    FilterRegistrationBean<AccountGateFilter> accountGateFilterRegistration(AccountGateFilter filter) {
+        FilterRegistrationBean<AccountGateFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AccessCookieFilter accessCookieFilter,
                                             CsrfProtectionFilter csrfProtectionFilter,
+                                            AccountGateFilter accountGateFilter,
                                             ObjectMapper objectMapper) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -71,12 +80,13 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/health", "/api/auth/csrf", "/api/auth/google/callback", "/api/users/*",
                                 "/api/categories", "/api/items", "/api/items/*", "/api/items/*/availability", "/api/images/*", "/api/ai/status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh",
-                                "/api/auth/logout", "/api/auth/google").permitAll()
+                                "/api/auth/logout", "/api/auth/google", "/api/auth/mfa/verify").permitAll()
                         .requestMatchers("/api/moderation/users/**").hasRole("ADMIN")
                         .requestMatchers("/api/moderation/**").hasAnyRole("MODERATOR", "ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(accessCookieFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(csrfProtectionFilter, AccessCookieFilter.class)
+                .addFilterAfter(accountGateFilter, CsrfProtectionFilter.class)
                 .build();
     }
 }

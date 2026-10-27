@@ -17,6 +17,8 @@ public class AuthProperties {
     private boolean secureCookies = false;
     private boolean demoRegistration = false;
     private boolean demoRegistrationOnHttps = false;
+    private boolean registrationEnabled = false;
+    private String mfaEncryptionKey = "";
     private String rateLimitHmacKey = "";
     private final List<String> trustedProxies = new ArrayList<>();
     private final List<String> allowedOrigins = new ArrayList<>();
@@ -44,6 +46,17 @@ public class AuthProperties {
     public void setDemoRegistrationOnHttps(boolean value) { this.demoRegistrationOnHttps = value; }
     public boolean registrationOpen() {
         return demoRegistration && (!secureCookies || demoRegistrationOnHttps);
+    }
+    public boolean isRegistrationEnabled() { return registrationEnabled; }
+    public void setRegistrationEnabled(boolean value) { this.registrationEnabled = value; }
+    /** Public or demo registration is allowed only when a mail transport can deliver the verification code. */
+    public boolean registrationAllowed(boolean mailAvailable) {
+        return mailAvailable && (registrationEnabled || registrationOpen());
+    }
+    public String getMfaEncryptionKey() { return mfaEncryptionKey; }
+    public void setMfaEncryptionKey(String value) { this.mfaEncryptionKey = value; }
+    public boolean googleConfigured() {
+        return !googleClientId.isBlank() && !googleClientSecret.isBlank() && !callbackUrl.isBlank() && secureCookies;
     }
     public String getRateLimitHmacKey() { return rateLimitHmacKey; }
     public void setRateLimitHmacKey(String rateLimitHmacKey) { this.rateLimitHmacKey = rateLimitHmacKey; }

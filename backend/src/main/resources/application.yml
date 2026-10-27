@@ -33,6 +33,8 @@ lendly:
     secure-cookies: ${LENDLY_SECURE_COOKIES:false}
     demo-registration: ${LENDLY_DEMO_REGISTRATION:false}
     demo-registration-on-https: ${LENDLY_DEMO_REGISTRATION_ON_HTTPS:false}
+    registration-enabled: ${LENDLY_REGISTRATION_ENABLED:false}
+    mfa-encryption-key: ${LENDLY_MFA_ENCRYPTION_KEY:}
     rate-limit-hmac-key: ${LENDLY_RATE_LIMIT_HMAC_KEY:}
     allowed-origins: ${LENDLY_ALLOWED_ORIGINS:}
     trusted-proxies: ${LENDLY_TRUSTED_PROXIES:}
@@ -68,6 +70,21 @@ lendly:
       ai-scan-window-seconds: ${LENDLY_RATE_AI_SCAN_WINDOW_SECONDS:3600}
       mission: ${LENDLY_RATE_MISSION:30}
       mission-window-seconds: ${LENDLY_RATE_MISSION_WINDOW_SECONDS:3600}
+      email-verify: ${LENDLY_RATE_EMAIL_VERIFY:10}
+      email-verify-window-seconds: ${LENDLY_RATE_EMAIL_VERIFY_WINDOW_SECONDS:900}
+      email-resend: ${LENDLY_RATE_EMAIL_RESEND:5}
+      email-resend-window-seconds: ${LENDLY_RATE_EMAIL_RESEND_WINDOW_SECONDS:3600}
+      mfa-verify: ${LENDLY_RATE_MFA_VERIFY:10}
+      mfa-verify-window-seconds: ${LENDLY_RATE_MFA_VERIFY_WINDOW_SECONDS:900}
+      mfa-manage: ${LENDLY_RATE_MFA_MANAGE:10}
+      mfa-manage-window-seconds: ${LENDLY_RATE_MFA_MANAGE_WINDOW_SECONDS:900}
+  mail:
+    # Own namespace on purpose: spring.mail.host would auto-configure a sender even when empty.
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${LENDLY_MAIL_FROM:}
   storage:
     image-dir: ${LENDLY_IMAGE_DIR:}
   ai:

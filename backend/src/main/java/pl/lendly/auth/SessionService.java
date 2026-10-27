@@ -94,6 +94,13 @@ public class SessionService {
         jdbc.update("UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = ?", sessionId);
     }
 
+    public void revokeOthers(UUID userId, UUID keepSessionId) {
+        jdbc.update("""
+                UPDATE auth_sessions SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND id <> ? AND revoked_at IS NULL
+                """, userId, keepSessionId);
+    }
+
     public void revokeByRefreshHash(byte[] refreshHash) {
         jdbc.update("""
                 UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP

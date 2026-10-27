@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.lendly.common.api.ApiException;
 import pl.lendly.config.AuthProperties;
+import pl.lendly.mail.MailService;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
@@ -20,18 +21,23 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(12);
     private final String dummyHash;
     private final AuthProperties properties;
+    private final MfaService mfa;
+    private final MailService mail;
 
-    public AuthService(AuthRepository repository, SessionService sessions, CsrfService csrf, AuthProperties properties) {
+    public AuthService(AuthRepository repository, SessionService sessions, CsrfService csrf, AuthProperties properties,
+                       MfaService mfa, MailService mail) {
         this.repository = repository;
         this.sessions = sessions;
         this.csrf = csrf;
         this.properties = properties;
+        this.mfa = mfa;
+        this.mail = mail;
         this.dummyHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     @Transactional
     public LoginResult register(String displayNameInput, String emailInput, String password) {
-        if (!properties.registrationOpen()) {
+        if (!properties.registrationAllowed(mail.available())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "REGISTRATION_DISABLED", "Registration is not enabled.");
         }
         String displayName = normalizeDisplayName(displayNameInput);
@@ -43,7 +49,7 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", "An account with this email already exists."));
         String sessionCsrf = csrf.issuePendingSessionToken();
         SessionService.IssuedSession issued = sessions.create(user.id(), sessionCsrf);
-        return new LoginResult(user, issued, sessionCsrf);
+        return new LoginResult(user, issued, sessionCsrf, null);
     }
 
     @Transactional
@@ -58,9 +64,30 @@ public class AuthService {
         if (user == null || user.status().equals("SUSPENDED") || user.passwordHash() == null || !matches) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Email or password is incorrect.");
         }
+        if (mfa.isEnabled(user.id())) return new LoginResult(user, null, null, mfa.createChallenge(user.id()));
         String sessionCsrf = csrf.issuePendingSessionToken();
         SessionService.IssuedSession issued = sessions.create(user.id(), sessionCsrf);
-        return new LoginResult(user, issued, sessionCsrf);
+        return new LoginResult(user, issued, sessionCsrf, null);
+    }
+
+    /** Redeems the MFA challenge and, only on success, opens the session. */
+    public LoginResult completeMfaLogin(String challengeToken, String code) {
+        MfaService.Redemption redemption = mfa.redeemChallenge(challengeToken, code);
+        switch (redemption.kind()) {
+            case WRONG_CODE -> throw new ApiException(HttpStatus.BAD_REQUEST, "MFA_CODE_INVALID", "The code is incorrect.");
+            case CHALLENGE_INVALID -> throw challengeInvalid();
+            default -> { }
+        }
+        AuthUser user = repository.findById(redemption.userId()).filter(found -> found.status().equals("ACTIVE"))
+                .orElseThrow(this::challengeInvalid);
+        String sessionCsrf = csrf.issuePendingSessionToken();
+        return new LoginResult(user, sessions.create(user.id(), sessionCsrf), sessionCsrf, null);
+    }
+
+    public AuthDtos.PrivateProfile profile(AuthUser user) { return user.privateProfile(mfa.isEnabled(user.id())); }
+
+    private ApiException challengeInvalid() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "MFA_CHALLENGE_INVALID", "The sign-in step expired. Sign in again.");
     }
 
     public AuthUser current(AuthPrincipal principal) {
@@ -131,5 +158,5 @@ public class AuthService {
         return true;
     }
 
-    public record LoginResult(AuthUser user, SessionService.IssuedSession session, String csrfToken) {}
+    public record LoginResult(AuthUser user, SessionService.IssuedSession session, String csrfToken, String mfaChallenge) {}
 }

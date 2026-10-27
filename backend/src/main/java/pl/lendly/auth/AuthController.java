@@ -27,15 +27,20 @@ public class AuthController {
     private final AuthCookieSupport cookies;
     private final RateLimiter limiter;
     private final GoogleOidcService google;
+    private final MfaService mfa;
+    private final EmailVerificationService verification;
 
     public AuthController(AuthService auth, CsrfService csrf, SessionService sessions,
-                          AuthCookieSupport cookies, RateLimiter limiter, GoogleOidcService google) {
+                          AuthCookieSupport cookies, RateLimiter limiter, GoogleOidcService google,
+                          MfaService mfa, EmailVerificationService verification) {
         this.auth = auth;
         this.csrf = csrf;
         this.sessions = sessions;
         this.cookies = cookies;
         this.limiter = limiter;
         this.google = google;
+        this.mfa = mfa;
+        this.verification = verification;
     }
 
     @GetMapping("/csrf")
@@ -57,18 +62,41 @@ public class AuthController {
         limiter.registration(request);
         AuthService.LoginResult result = auth.register(body.displayName(), body.email(), body.password());
         establish(response, result);
+        verification.sendInitialCode(result.user());
         return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
-                .body(new AuthResponse(result.user().privateProfile(), result.csrfToken()));
+                .body(new AuthResponse(auth.profile(result.user()), result.csrfToken()));
     }
 
     @PostMapping("/login")
-    ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest body, HttpServletRequest request,
-                                       HttpServletResponse response) {
+    ResponseEntity<?> login(@Valid @RequestBody LoginRequest body, HttpServletRequest request,
+                            HttpServletResponse response) {
         limiter.login(request, body.email().trim().toLowerCase(java.util.Locale.ROOT));
         AuthService.LoginResult result = auth.login(body.email(), body.password());
+        if (result.mfaChallenge() != null) {
+            startMfaChallenge(response, result.mfaChallenge());
+            return ResponseEntity.status(HttpStatus.ACCEPTED).cacheControl(CacheControl.noStore())
+                    .body(new MfaRequiredResponse(true));
+        }
         establish(response, result);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(new AuthResponse(result.user().privateProfile(), result.csrfToken()));
+                .body(new AuthResponse(auth.profile(result.user()), result.csrfToken()));
+    }
+
+    @PostMapping("/mfa/verify")
+    ResponseEntity<AuthResponse> mfaVerify(@Valid @RequestBody CodeRequest body, HttpServletRequest request,
+                                           HttpServletResponse response) {
+        limiter.mfaVerify(request);
+        AuthService.LoginResult result;
+        try {
+            result = auth.completeMfaLogin(cookies.read(request, cookies.mfaName()), body.code());
+        } catch (ApiException exception) {
+            if (exception.code().equals("MFA_CHALLENGE_INVALID")) cookies.clearMfaChallenge(response);
+            throw exception;
+        }
+        establish(response, result);
+        cookies.clearMfaChallenge(response);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(new AuthResponse(auth.profile(result.user()), result.csrfToken()));
     }
 
     @PostMapping("/refresh")
@@ -119,6 +147,10 @@ public class AuthController {
                 cookies.read(request, cookies.csrfName()));
         switch (result.kind()) {
             case SIGNED_IN -> {
+                if (mfa.isEnabled(result.user().id())) {
+                    startMfaChallenge(response, mfa.createChallenge(result.user().id()));
+                    return redirect("/login/mfa");
+                }
                 String csrfToken = csrf.issuePendingSessionToken();
                 issueCookies(response, sessions.create(result.user().id(), csrfToken));
                 cookies.clearContext(response);
@@ -136,6 +168,11 @@ public class AuthController {
         redirect.setExposeModelAttributes(false);
         redirect.setStatusCode(org.springframework.http.HttpStatus.FOUND);
         return redirect;
+    }
+
+    private void startMfaChallenge(HttpServletResponse response, String challenge) {
+        cookies.setMfaChallenge(response, challenge, java.time.Duration.ofMinutes(5));
+        cookies.clearContext(response);
     }
 
     private void establish(HttpServletResponse response, AuthService.LoginResult result) {

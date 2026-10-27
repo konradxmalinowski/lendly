@@ -35,6 +35,14 @@ public class RateLimitProperties {
     private long aiScanWindowSeconds = 3600;
     private int mission = 30;
     private long missionWindowSeconds = 3600;
+    private int emailVerify = 10;
+    private long emailVerifyWindowSeconds = 900;
+    private int emailResend = 5;
+    private long emailResendWindowSeconds = 3600;
+    private int mfaVerify = 10;
+    private long mfaVerifyWindowSeconds = 900;
+    private int mfaManage = 10;
+    private long mfaManageWindowSeconds = 900;
 
     public int getRegistration() { return registration; }
     public void setRegistration(int value) { registration = value; }
@@ -98,4 +106,20 @@ public class RateLimitProperties {
     public void setMission(int value) { mission = value; }
     public long getMissionWindowSeconds() { return missionWindowSeconds; }
     public void setMissionWindowSeconds(long value) { missionWindowSeconds = value; }
+    public int getEmailVerify() { return emailVerify; }
+    public void setEmailVerify(int value) { emailVerify = value; }
+    public long getEmailVerifyWindowSeconds() { return emailVerifyWindowSeconds; }
+    public void setEmailVerifyWindowSeconds(long value) { emailVerifyWindowSeconds = value; }
+    public int getEmailResend() { return emailResend; }
+    public void setEmailResend(int value) { emailResend = value; }
+    public long getEmailResendWindowSeconds() { return emailResendWindowSeconds; }
+    public void setEmailResendWindowSeconds(long value) { emailResendWindowSeconds = value; }
+    public int getMfaVerify() { return mfaVerify; }
+    public void setMfaVerify(int value) { mfaVerify = value; }
+    public long getMfaVerifyWindowSeconds() { return mfaVerifyWindowSeconds; }
+    public void setMfaVerifyWindowSeconds(long value) { mfaVerifyWindowSeconds = value; }
+    public int getMfaManage() { return mfaManage; }
+    public void setMfaManage(int value) { mfaManage = value; }
+    public long getMfaManageWindowSeconds() { return mfaManageWindowSeconds; }
+    public void setMfaManageWindowSeconds(long value) { mfaManageWindowSeconds = value; }
 }

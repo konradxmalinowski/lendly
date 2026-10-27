@@ -12,11 +12,14 @@ public class AuthConfigurationGuard implements ApplicationRunner {
     private final AuthProperties properties;
     private final RateLimitProperties limits;
     private final Environment environment;
+    private final MailProperties mail;
 
-    public AuthConfigurationGuard(AuthProperties properties, RateLimitProperties limits, Environment environment) {
+    public AuthConfigurationGuard(AuthProperties properties, RateLimitProperties limits, Environment environment,
+                                  MailProperties mail) {
         this.properties = properties;
         this.limits = limits;
         this.environment = environment;
+        this.mail = mail;
     }
 
     @Override
@@ -35,7 +38,11 @@ public class AuthConfigurationGuard implements ApplicationRunner {
                 || limits.getReservationCreate() < 1 || limits.getReservationCreateWindowSeconds() < 1
                 || limits.getReportCreate() < 1 || limits.getReportCreateWindowSeconds() < 1
                 || limits.getAiScan() < 1 || limits.getAiScanWindowSeconds() < 1
-                || limits.getMission() < 1 || limits.getMissionWindowSeconds() < 1) {
+                || limits.getMission() < 1 || limits.getMissionWindowSeconds() < 1
+                || limits.getEmailVerify() < 1 || limits.getEmailVerifyWindowSeconds() < 1
+                || limits.getEmailResend() < 1 || limits.getEmailResendWindowSeconds() < 1
+                || limits.getMfaVerify() < 1 || limits.getMfaVerifyWindowSeconds() < 1
+                || limits.getMfaManage() < 1 || limits.getMfaManageWindowSeconds() < 1) {
             throw new IllegalStateException("All rate limits and windows must be positive.");
         }
         URI publicOrigin = properties.getPublicOrigin().isBlank() ? null : parse(properties.getPublicOrigin());
@@ -65,6 +72,23 @@ public class AuthConfigurationGuard implements ApplicationRunner {
         }
         if (production && properties.getJwtSecret().isBlank()) {
             throw new IllegalStateException("Production auth requires a configured JWT signing key.");
+        }
+        if (!properties.getMfaEncryptionKey().isBlank()) {
+            try { MfaEncryptionKey.decode(properties.getMfaEncryptionKey()); }
+            catch (IllegalArgumentException exception) {
+                throw new IllegalStateException("MFA encryption key must be canonical Base64 encoding exactly 32 random bytes.");
+            }
+            if (properties.getMfaEncryptionKey().equals(properties.getJwtSecret())) {
+                throw new IllegalStateException("MFA encryption key must differ from the JWT signing key.");
+            }
+        } else if (!localProfile) {
+            throw new IllegalStateException("MFA requires LENDLY_MFA_ENCRYPTION_KEY outside the local profile.");
+        }
+        if (!mail.host().isBlank() && mail.from().isBlank()) {
+            throw new IllegalStateException("LENDLY_MAIL_FROM is required when MAIL_HOST is set.");
+        }
+        if (mail.port() < 1 || mail.port() > 65535) {
+            throw new IllegalStateException("MAIL_PORT must be a valid port.");
         }
         boolean anyGoogleValue = !properties.getGoogleClientId().isBlank()
                 || !properties.getGoogleClientSecret().isBlank() || !properties.getCallbackUrl().isBlank();

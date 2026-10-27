@@ -25,7 +25,7 @@ public class ProfileController {
 
     @GetMapping("/me")
     ResponseEntity<PrivateProfile> me(@AuthenticationPrincipal AuthPrincipal principal) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(auth.current(principal).privateProfile());
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(auth.profile(auth.current(principal)));
     }
 
     @PatchMapping("/me")
@@ -46,7 +46,7 @@ public class ProfileController {
         String name = stringField(body, "displayName", hasName, false);
         String area = stringField(body, "areaLabel", hasArea, true);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(auth.updateProfile(principal, new ProfilePatch(name, area), hasName, hasArea).privateProfile());
+                .body(auth.profile(auth.updateProfile(principal, new ProfilePatch(name, area), hasName, hasArea)));
     }
 
     @GetMapping("/users/{id}")

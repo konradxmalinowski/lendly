@@ -24,7 +24,7 @@ public class RateLimiter {
     private final RateLimitProperties limits;
     // Fixed-size keyed buckets bound memory without turning table saturation into
     // a global deny. Hash collisions can only make the affected slot stricter.
-    private final Bucket[][] buckets = new Bucket[17][BUCKET_COUNT];
+    private final Bucket[][] buckets = new Bucket[21][BUCKET_COUNT];
     private final byte[] bucketKey = new byte[32];
 
     public RateLimiter(ClientAddressResolver addresses, AuthProperties properties, RateLimitProperties limits) {
@@ -73,6 +73,26 @@ public class RateLimiter {
 
     public void mission(java.util.UUID userId) {
         hit("mission:" + userId, limits.getMission(), Duration.ofSeconds(limits.getMissionWindowSeconds()));
+    }
+
+    public void emailVerify(java.util.UUID userId) {
+        hit("email-verify:" + userId, limits.getEmailVerify(), Duration.ofSeconds(limits.getEmailVerifyWindowSeconds()));
+    }
+
+    public void emailResend(java.util.UUID userId) {
+        hit("email-resend:" + userId, limits.getEmailResend(), Duration.ofSeconds(limits.getEmailResendWindowSeconds()));
+    }
+
+    public void mfaVerify(HttpServletRequest request) {
+        hit("mfa-verify:" + addresses.resolve(request), limits.getMfaVerify(), Duration.ofSeconds(limits.getMfaVerifyWindowSeconds()));
+    }
+
+    public void mfaVerifyUser(java.util.UUID userId) {
+        hit("mfa-verify:user:" + userId, limits.getMfaVerify() * 3, Duration.ofSeconds(limits.getMfaVerifyWindowSeconds()));
+    }
+
+    public void mfaManage(java.util.UUID userId) {
+        hit("mfa-manage:" + userId, limits.getMfaManage(), Duration.ofSeconds(limits.getMfaManageWindowSeconds()));
     }
 
     public void search(HttpServletRequest request) {
@@ -130,6 +150,10 @@ public class RateLimiter {
         if (key.startsWith("report-create:")) return 14;
         if (key.startsWith("ai-scan:")) return 15;
         if (key.startsWith("mission:")) return 16;
+        if (key.startsWith("email-verify:")) return 17;
+        if (key.startsWith("email-resend:")) return 18;
+        if (key.startsWith("mfa-verify:")) return 19;
+        if (key.startsWith("mfa-manage:")) return 20;
         throw new IllegalArgumentException("Unknown rate-limit scope.");
     }
 

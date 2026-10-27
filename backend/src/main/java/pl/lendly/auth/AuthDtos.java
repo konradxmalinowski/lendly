@@ -25,7 +25,10 @@ public final class AuthDtos {
     public record AuthResponse(PrivateProfile user, String csrfToken) {}
     public record PrivateProfile(UUID id, String email, boolean emailVerified, String displayName,
                                  String avatarUrl, String areaLabel, String role, String status,
-                                 Instant registeredAt) {}
+                                 Instant registeredAt, boolean mfaEnabled, boolean mfaRequired) {}
+    public record MfaRequiredResponse(boolean mfaRequired) {}
+    public record CodeRequest(@jakarta.validation.constraints.NotNull @Size(max = 64) String code) {}
+    public record RecoveryCodesResponse(java.util.List<String> recoveryCodes) {}
     public record PublicProfile(UUID id, String displayName, String avatarUrl, String areaLabel,
                                 Instant registeredAt) {}
 }

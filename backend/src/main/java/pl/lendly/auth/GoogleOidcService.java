@@ -56,6 +56,7 @@ public class GoogleOidcService {
     public String startLink(AuthPrincipal principal) {
         ensureConfigured();
         if (!principal.user().status().equals("ACTIVE")) throw new ApiException(HttpStatus.FORBIDDEN, "ACCOUNT_SUSPENDED", "This account cannot access the service.");
+        if (!principal.user().emailVerified()) throw new ApiException(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED", "Verify your email address first.");
         return start(Intent.LINK, principal.user().id(), principal.sessionId(), null);
     }
 
@@ -74,9 +75,27 @@ public class GoogleOidcService {
             if (tx.intent == Intent.LINK) return link(principal, identity);
             AuthUser linked = users.findGoogleIdentity(identity.subject).orElse(null);
             if (linked != null) return linked.status().equals("ACTIVE") ? CallbackResult.signedIn(linked) : CallbackResult.failure(false);
-            if (users.emailExists(identity.email)) return CallbackResult.linkRequired();
-            try { return CallbackResult.signedIn(createUser(identity)); }
-            catch (org.springframework.dao.DuplicateKeyException exception) { return CallbackResult.linkRequired(); }
+            AuthUser local = users.findByEmail(identity.email).orElse(null);
+            try {
+                if (local == null) return CallbackResult.signedIn(createUser(identity));
+                // Only Gmail or a Workspace domain vouched for by `hd` proves control of the address; any other
+                // domain can change hands, so those users link from the profile after a password sign-in.
+                if (!authoritativeFor(identity)) return CallbackResult.linkRequired();
+                if (!local.status().equals("ACTIVE")) return CallbackResult.failure(false);
+                if (local.emailVerified()) {
+                    transactions.executeWithoutResult(status -> users.linkGoogle(local.id(), identity.subject, identity.email));
+                    return CallbackResult.signedIn(local);
+                }
+                // Safe because only the Google owner has proven the address; whoever set the local password never did.
+                AuthUser taken = transactions.execute(status -> {
+                    AuthUser locked = users.lockById(local.id()).orElse(null);
+                    if (locked == null || !locked.status().equals("ACTIVE")) return null;
+                    if (locked.emailVerified()) users.linkGoogle(locked.id(), identity.subject, identity.email);
+                    else users.takeOverUnverified(locked.id(), identity.subject, identity.email);
+                    return locked;
+                });
+                return taken == null ? CallbackResult.failure(false) : CallbackResult.signedIn(taken);
+            } catch (org.springframework.dao.DuplicateKeyException exception) { return CallbackResult.linkRequired(); }
         } catch (Exception exception) {
             return CallbackResult.failure(tx.intent == Intent.LINK);
         }
@@ -130,11 +149,21 @@ public class GoogleOidcService {
         if (!ISSUER.equals(issuer) || !jwt.getAudience().contains(properties.getGoogleClientId())
                 || !tx.nonce.equals(nonce) || subject == null || subject.isBlank() || !Boolean.TRUE.equals(emailVerified)
                 || email == null || !email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) throw new IllegalArgumentException();
-        return new Identity(subject, email.trim().toLowerCase(Locale.ROOT), jwt.getClaimAsString("name"));
+        return new Identity(subject, email.trim().toLowerCase(Locale.ROOT), jwt.getClaimAsString("name"),
+                jwt.getClaimAsString("hd"));
+    }
+
+    private boolean authoritativeFor(Identity identity) {
+        String domain = identity.email.substring(identity.email.indexOf('@') + 1);
+        return domain.equals("gmail.com")
+                || identity.hostedDomain != null && !identity.hostedDomain.isBlank() && identity.hostedDomain.equalsIgnoreCase(domain);
     }
 
     private CallbackResult link(AuthPrincipal principal, Identity identity) {
         return transactions.execute(status -> {
+            // Row lock plus re-check: an unverified account must not gain a Google identity, even mid-takeover.
+            AuthUser fresh = users.lockById(principal.user().id()).orElse(null);
+            if (fresh == null || !fresh.emailVerified()) return CallbackResult.failure(true);
             AuthUser collision = users.findGoogleIdentity(identity.subject).orElse(null);
             if (collision != null && !collision.id().equals(principal.user().id())) return CallbackResult.failure(true);
             if (collision == null) users.linkGoogle(principal.user().id(), identity.subject, identity.email);
@@ -176,7 +205,7 @@ public class GoogleOidcService {
     private record OidcTransaction(Intent intent, UUID userId, UUID sessionId, String csrfContextId, String nonce,
                                    OAuth2AuthorizationRequest authorizationRequest, Instant expiresAt) {}
     private enum Intent { SIGN_IN, LINK }
-    private record Identity(String subject, String email, String name) {}
+    private record Identity(String subject, String email, String name, String hostedDomain) {}
     public record CallbackResult(Kind kind, AuthUser user, boolean linkIntent) {
         static CallbackResult failure(boolean linkIntent) { return new CallbackResult(Kind.FAILURE, null, linkIntent); }
         static CallbackResult linkRequired() { return new CallbackResult(Kind.LINK_REQUIRED, null, false); }

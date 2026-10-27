@@ -17,7 +17,7 @@ import java.util.Set;
 @Component
 public class CsrfProtectionFilter extends OncePerRequestFilter {
     private static final Set<String> ANONYMOUS_CSRF_PATHS = Set.of(
-            "/api/auth/register", "/api/auth/login", "/api/auth/google");
+            "/api/auth/register", "/api/auth/login", "/api/auth/google", "/api/auth/mfa/verify");
     private final CsrfService csrf;
     private final AuthCookieSupport cookies;
     private final ObjectMapper mapper;
