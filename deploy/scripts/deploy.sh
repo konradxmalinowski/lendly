@@ -2,7 +2,7 @@
 # Build locally and release to the VMs. Usage:
 #   deploy/scripts/deploy.sh api|web|all        build, upload a timestamped release, switch, restart, health check
 #   deploy/scripts/deploy.sh rollback api|web   switch back to the previous release
-# Hosts come from deploy/hosts.env (WEB_HOST, API_HOST, SSH_USER). Requires key-based SSH and sudo on the VMs.
+# Hosts come from deploy/hosts.env (WEB_HOST, API_HOST, SSH_USER; optional TRUSTED_PROXY). Requires key-based SSH and sudo on the VMs.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 # shellcheck source=/dev/null
@@ -15,7 +15,7 @@ remote() { $SSH "$SSH_USER@$1" "LC_ALL=C.UTF-8 sudo bash -s" ; }
 
 release_api() {
   (cd "$ROOT/backend" && JAVA_HOME=${JAVA_HOME:-/opt/homebrew/opt/openjdk@21} mvn -q -DskipTests package)
-  scp -q "$ROOT/backend/target/lendly-api-0.1.0-SNAPSHOT.jar" "$SSH_USER@$API_HOST:/tmp/lendly-api.jar"
+  scp -q "$ROOT/backend/target/lendly-api-0.2.0.jar" "$SSH_USER@$API_HOST:/tmp/lendly-api.jar"
   scp -q "$ROOT/deploy/systemd/lendly-api.service" "$SSH_USER@$API_HOST:/tmp/lendly-api.service"
   remote "$API_HOST" <<EOF
 set -e
@@ -36,6 +36,14 @@ EOF
 }
 
 release_web() {
+  # Fill the optional trusted-proxy placeholder; without a value both real_ip lines are removed so nginx -t never sees it.
+  TRUSTED_PROXY=${TRUSTED_PROXY:-}
+  if [ -n "$TRUSTED_PROXY" ]; then
+    [[ "$TRUSTED_PROXY" =~ ^[0-9a-fA-F:./]+$ ]] || { echo "TRUSTED_PROXY must be an IP address or CIDR" >&2; exit 1; }
+    PROXY_SED="s#__TRUSTED_PROXY__#$TRUSTED_PROXY#g"
+  else
+    PROXY_SED="/__TRUSTED_PROXY__/d;/real_ip_header/d"
+  fi
   (cd "$ROOT/frontend" && npx ng build >/dev/null)
   COPYFILE_DISABLE=1 tar --no-mac-metadata -C "$ROOT/frontend/dist/lendly/browser" -czf /tmp/lendly-web.tgz .
   scp -q /tmp/lendly-web.tgz "$SSH_USER@$WEB_HOST:/tmp/lendly-web.tgz"
@@ -46,7 +54,7 @@ set -e
 install -d -m 755 /var/www/lendly/releases/$STAMP
 tar -C /var/www/lendly/releases/$STAMP -xzf /tmp/lendly-web.tgz
 rm -f /tmp/lendly-web.tgz
-sed "s/__API_HOST__/$API_HOST/g; s/__WEB_HOST__/$WEB_HOST/g" /tmp/lendly.conf > /etc/nginx/sites-available/lendly.conf
+sed "s/__API_HOST__/$API_HOST/g; s/__WEB_HOST__/$WEB_HOST/g; $PROXY_SED" /tmp/lendly.conf > /etc/nginx/sites-available/lendly.conf
 rm -f /tmp/lendly.conf
 ln -sfn /etc/nginx/sites-available/lendly.conf /etc/nginx/sites-enabled/lendly.conf
 rm -f /etc/nginx/sites-enabled/default
