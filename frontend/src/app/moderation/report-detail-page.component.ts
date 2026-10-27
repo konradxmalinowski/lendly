@@ -4,6 +4,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Observable, switchMap, tap } from 'rxjs';
+import { apiErrorCode } from '../auth/auth-ui.helpers';
+import { MfaSetupPromptComponent } from '../auth/mfa-setup-prompt.component';
 import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { ModerationAction, ReportDetail, historyLabels, reportReasonLabels, reportStatusLabels } from './moderation.models';
 import { ModerationService } from './moderation.service';
@@ -35,7 +37,7 @@ const ACTIONS: Record<ModerationAction, ActionConfig> = {
 @Component({
   selector: 'lendly-report-detail-page',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, MfaSetupPromptComponent, RouterLink],
   templateUrl: './report-detail-page.component.html',
   styleUrl: './report-detail-page.component.scss'
 })
@@ -49,6 +51,7 @@ export class ReportDetailPageComponent {
   readonly pending = signal<ModerationAction | null>(null);
   readonly busy = signal(false);
   readonly actionError = signal('');
+  readonly mfaSetupRequired = signal(false);
   readonly successMessage = signal('');
   reason = '';
 
@@ -72,6 +75,7 @@ export class ReportDetailPageComponent {
         this.loading.set(false);
       },
       error: (error: unknown) => {
+        this.mfaSetupRequired.set(apiErrorCode(error) === 'MFA_SETUP_REQUIRED');
         this.loadError.set(error instanceof HttpErrorResponse && error.status === 403
           ? 'Nie masz dostępu do moderacji.'
           : error instanceof HttpErrorResponse && error.status === 404 ? 'Nie znaleziono tego zgłoszenia.'
@@ -113,7 +117,8 @@ export class ReportDetailPageComponent {
       },
       error: (error: unknown) => {
         this.busy.set(false);
-        const code = error instanceof HttpErrorResponse ? (error.error as { code?: string } | null)?.code : null;
+        const code = apiErrorCode(error);
+        this.mfaSetupRequired.set(code === 'MFA_SETUP_REQUIRED');
         this.actionError.set(code === 'FORBIDDEN' ? 'Ta akcja wymaga uprawnień administratora.'
           : code === 'CANNOT_SUSPEND_ADMIN' ? 'Konta administratora nie można tu zawiesić.'
           : code === 'CANNOT_SUSPEND_SELF' ? 'Nie możesz zawiesić własnego konta.'

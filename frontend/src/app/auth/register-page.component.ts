@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { authenticationMessage, isGoogleAuthorizationUrl, safeReturnPath } from './auth-ui.helpers';
@@ -20,6 +20,10 @@ import { noControlCharacters, passwordRules, trimmedRequired, unicodeLength } fr
       </div>
 
       <div class="auth-panel">
+        @if (!registrationOpen()) {
+          <p class="form-notice" role="status">Rejestracja jest teraz wyłączona. Nowe konta nie są przyjmowane.</p>
+          <a class="button-primary" routerLink="/login" [queryParams]="returnQuery">Zaloguj się na istniejące konto</a>
+        } @else {
         @if (errorMessage()) {
           <p class="form-error-summary" role="alert">{{ errorMessage() }}</p>
         }
@@ -90,11 +94,20 @@ import { noControlCharacters, passwordRules, trimmedRequired, unicodeLength } fr
         </form>
 
         <div class="auth-divider" aria-hidden="true"><span>lub</span></div>
-        <button class="button-secondary google-button" type="button" [disabled]="busy()" (click)="signInWithGoogle()">
+        <button
+          class="button-secondary google-button"
+          type="button"
+          [disabled]="busy() || !googleAvailable()"
+          [attr.aria-describedby]="googleAvailable() ? null : 'google-unavailable'"
+          (click)="signInWithGoogle()">
           Kontynuuj z Google
         </button>
+        @if (!googleAvailable()) {
+          <p class="field-hint google-hint" id="google-unavailable">Logowanie przez Google jest teraz niedostępne. Użyj adresu e-mail i hasła.</p>
+        }
 
         <p class="auth-switch">Masz już konto? <a routerLink="/login" [queryParams]="returnQuery">Zaloguj się</a></p>
+        }
       </div>
     </section>
   `,
@@ -116,9 +129,15 @@ export class RegisterPageComponent {
   readonly busy = signal(false);
   readonly passwordVisible = signal(false);
   readonly errorMessage = signal('');
+  readonly registrationOpen = computed(() => this.auth.features()?.registration !== false);
+  readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn !== false);
   readonly returnQuery = this.route.snapshot.queryParamMap.has('returnUrl')
     ? { returnUrl: safeReturnPath(this.route.snapshot.queryParamMap.get('returnUrl')) }
     : undefined;
+
+  constructor() {
+    this.auth.loadFeatures();
+  }
 
   showDisplayNameError(): boolean {
     return this.form.controls.displayName.invalid && this.form.controls.displayName.touched;
@@ -148,7 +167,12 @@ export class RegisterPageComponent {
     this.busy.set(true);
     const values = this.form.getRawValue();
     this.auth.register(values.displayName.trim(), values.email.trim().toLowerCase(), values.password).subscribe({
-      next: () => void this.router.navigateByUrl(safeReturnPath(this.route.snapshot.queryParamMap.get('returnUrl'))),
+      next: ({ user }) => {
+        const returnUrl = safeReturnPath(this.route.snapshot.queryParamMap.get('returnUrl'));
+        void (user.emailVerified
+          ? this.router.navigateByUrl(returnUrl)
+          : this.router.navigate(['/verify-email'], { queryParams: { returnUrl }, state: { codeSentAt: Date.now() } }));
+      },
       error: (error: unknown) => {
         this.errorMessage.set(authenticationMessage(error, 'register'));
         this.busy.set(false);

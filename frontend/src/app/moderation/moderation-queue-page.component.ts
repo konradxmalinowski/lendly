@@ -2,6 +2,8 @@ import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { apiErrorCode } from '../auth/auth-ui.helpers';
+import { MfaSetupPromptComponent } from '../auth/mfa-setup-prompt.component';
 import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { Page } from '../catalog/catalog.models';
 import { ReportSummary, ReportTargetType, reportReasonLabels, reportStatusLabels } from './moderation.models';
@@ -10,12 +12,15 @@ import { ModerationService } from './moderation.service';
 @Component({
   selector: 'lendly-moderation-queue-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [MfaSetupPromptComponent, RouterLink],
   template: `
     <section class="queue-page" aria-labelledby="page-title">
       <p class="page-eyebrow">Moderacja</p>
       <h1 id="page-title" class="page-title" tabindex="-1">Zgłoszenia</h1>
 
+      @if (mfaSetupRequired()) {
+        <lendly-mfa-setup-prompt />
+      } @else {
       <div class="queue-controls">
         <nav class="state-tabs" aria-label="Stan zgłoszeń">
           <a routerLink="/moderation" [queryParams]="typeParam(null, 'OPEN')" [attr.aria-current]="state() === 'OPEN' ? 'page' : null">Otwarte</a>
@@ -75,6 +80,7 @@ import { ModerationService } from './moderation.service';
           }
         }
       }
+      }
     </section>
   `,
   styles: `
@@ -118,6 +124,7 @@ export class ModerationQueuePageComponent {
   readonly page = signal<Page<ReportSummary> | null>(null);
   readonly loading = signal(true);
   readonly errorMessage = signal('');
+  readonly mfaSetupRequired = signal(false);
   readonly reasons = reportReasonLabels;
   readonly statuses = reportStatusLabels;
 
@@ -153,14 +160,19 @@ export class ModerationQueuePageComponent {
     this.currentPage = page;
     this.loading.set(true);
     this.errorMessage.set('');
+    this.mfaSetupRequired.set(false);
     this.subscription?.unsubscribe();
     this.subscription = this.moderation.queue(this.state(), this.targetType(), page).subscribe({
       next: (results) => {
         this.page.set(results);
         this.loading.set(false);
       },
-      error: () => {
-        this.errorMessage.set('Nie udało się wczytać zgłoszeń. Spróbuj ponownie.');
+      error: (error: unknown) => {
+        if (apiErrorCode(error) === 'MFA_SETUP_REQUIRED') {
+          this.mfaSetupRequired.set(true);
+        } else {
+          this.errorMessage.set('Nie udało się wczytać zgłoszeń. Spróbuj ponownie.');
+        }
         this.loading.set(false);
       }
     });

@@ -6,7 +6,11 @@
     <p class="state-message" role="status">Wczytywanie zgłoszenia…</p>
   } @else if (loadError()) {
     <h1 id="page-title" class="page-title" tabindex="-1">Zgłoszenie niedostępne</h1>
-    <p class="notice-error" role="alert">{{ loadError() }}</p>
+    @if (mfaSetupRequired()) {
+      <lendly-mfa-setup-prompt />
+    } @else {
+      <p class="notice-error" role="alert">{{ loadError() }}</p>
+    }
   } @else if (report(); as item) {
     <header class="report-heading">
       <div>
@@ -49,7 +53,9 @@
         @if (item.allowedActions.length > 0) {
           <section class="actions" aria-labelledby="actions-title">
             <h2 id="actions-title">Działania</h2>
-            @if (actionError()) {
+            @if (mfaSetupRequired()) {
+              <lendly-mfa-setup-prompt />
+            } @else if (actionError()) {
               <p class="notice-error" role="alert">{{ actionError() }}</p>
             }
             @if (config(); as current) {

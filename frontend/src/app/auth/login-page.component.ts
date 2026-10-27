@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { authenticationMessage, isGoogleAuthorizationUrl, safeReturnPath } from './auth-ui.helpers';
@@ -74,9 +74,17 @@ import { setPrivatePageMetadata } from './private-page-metadata';
         </form>
 
         <div class="auth-divider" aria-hidden="true"><span>lub</span></div>
-        <button class="button-secondary google-button" type="button" [disabled]="busy()" (click)="signInWithGoogle()">
+        <button
+          class="button-secondary google-button"
+          type="button"
+          [disabled]="busy() || !googleAvailable()"
+          [attr.aria-describedby]="googleAvailable() ? null : 'google-unavailable'"
+          (click)="signInWithGoogle()">
           Kontynuuj z Google
         </button>
+        @if (!googleAvailable()) {
+          <p class="field-hint google-hint" id="google-unavailable">Logowanie przez Google jest teraz niedostępne. Użyj adresu e-mail i hasła.</p>
+        }
 
         <p class="auth-switch">Nie masz konta? <a routerLink="/register" [queryParams]="returnQuery">Utwórz konto</a></p>
       </div>
@@ -100,9 +108,14 @@ export class LoginPageComponent {
   readonly passwordVisible = signal(false);
   readonly errorMessage = signal('');
   readonly notice = signal(this.getAuthNotice());
+  readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn !== false);
   readonly returnQuery = this.route.snapshot.queryParamMap.has('returnUrl')
     ? { returnUrl: safeReturnPath(this.route.snapshot.queryParamMap.get('returnUrl')) }
     : undefined;
+
+  constructor() {
+    this.auth.loadFeatures();
+  }
 
   showEmailError(): boolean {
     return this.form.controls.email.invalid && this.form.controls.email.touched;
@@ -128,8 +141,15 @@ export class LoginPageComponent {
     this.busy.set(true);
     const { email, password } = this.form.getRawValue();
     this.auth.signIn(email.trim().toLowerCase(), password).subscribe({
-      next: () => {
-        void this.router.navigateByUrl(safeReturnPath(this.route.snapshot.queryParamMap.get('returnUrl')));
+      next: (result) => {
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        if (result.status === 'mfa-required') {
+          void this.router.navigate(['/login/mfa'], { queryParams: returnUrl ? { returnUrl: safeReturnPath(returnUrl) } : {} });
+        } else if (!result.user.emailVerified) {
+          void this.router.navigate(['/verify-email'], { queryParams: { returnUrl: safeReturnPath(returnUrl) } });
+        } else {
+          void this.router.navigateByUrl(safeReturnPath(returnUrl));
+        }
       },
       error: (error: unknown) => {
         this.errorMessage.set(authenticationMessage(error, 'login'));
@@ -162,6 +182,9 @@ export class LoginPageComponent {
     const code = this.route.snapshot.queryParamMap.get('auth');
     if (code === 'link-required') {
       return 'Ten adres jest już używany. Zaloguj się na istniejące konto, a potem połącz je z Google w profilu.';
+    }
+    if (code === 'mfa-expired') {
+      return 'Czas na wpisanie kodu minął albo kod podano zbyt wiele razy. Zaloguj się jeszcze raz.';
     }
     if (code === 'failed') {
       return 'Nie udało się zalogować przez Google. Spróbuj ponownie albo użyj hasła.';

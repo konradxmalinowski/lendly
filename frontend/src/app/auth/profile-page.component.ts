@@ -4,13 +4,14 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { authenticationMessage, isGoogleAuthorizationUrl } from './auth-ui.helpers';
 import { AuthService } from './auth.service';
+import { MfaSettingsComponent } from './mfa-settings.component';
 import { setPrivatePageMetadata } from './private-page-metadata';
 import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } from './auth.validators';
 
 @Component({
   selector: 'lendly-profile-page',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [MfaSettingsComponent, ReactiveFormsModule, RouterLink],
   template: `
     <section class="profile-page" aria-labelledby="page-title">
       <div class="profile-heading">
@@ -33,12 +34,19 @@ import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } f
 
       @if (user(); as profile) {
         <div class="profile-layout">
+          <div class="profile-stack">
           <section class="profile-panel" aria-labelledby="account-details-title">
             <h2 id="account-details-title">Dane konta</h2>
             <dl class="account-details">
               <div>
                 <dt>Adres e-mail</dt>
-                <dd>{{ profile.email }}</dd>
+                <dd>
+                  {{ profile.email }}
+                  @if (!profile.emailVerified) {
+                    <span class="unverified">Niepotwierdzony.</span>
+                    <a routerLink="/verify-email">Wpisz kod</a>
+                  }
+                </dd>
               </div>
               <div>
                 <dt>Data dołączenia</dt>
@@ -88,12 +96,28 @@ import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } f
             </form>
           </section>
 
+          @if (profile.emailVerified) {
+            <lendly-mfa-settings />
+          } @else {
+            <section class="profile-panel" aria-labelledby="mfa-pending-title">
+              <h2 id="mfa-pending-title">Weryfikacja dwuetapowa</h2>
+              <p class="field-hint">Najpierw <a routerLink="/verify-email">potwierdź adres e-mail</a>, a potem włączysz weryfikację dwuetapową.</p>
+            </section>
+          }
+          </div>
+
           <section class="profile-panel connection-panel" aria-labelledby="connection-title">
             <h2 id="connection-title">Połączone konto</h2>
             <p>Połącz Google z tym kontem, aby używać go do logowania.</p>
-            <button class="button-secondary" type="button" [disabled]="busy()" (click)="linkGoogle()">
+            <button class="button-secondary" type="button" [disabled]="busy() || !googleAvailable() || !profile.emailVerified"
+              [attr.aria-describedby]="googleAvailable() && profile.emailVerified ? null : 'google-unavailable'" (click)="linkGoogle()">
               Połącz z Google
             </button>
+            @if (!profile.emailVerified) {
+              <p class="field-hint google-hint" id="google-unavailable">Najpierw <a routerLink="/verify-email">potwierdź adres e-mail</a>, a potem połączysz konto z Google.</p>
+            } @else if (!googleAvailable()) {
+              <p class="field-hint google-hint" id="google-unavailable">Łączenie z Google jest teraz niedostępne.</p>
+            }
           </section>
         </div>
       } @else {
@@ -101,7 +125,12 @@ import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } f
       }
     </section>
   `,
-  styleUrl: './auth-page.component.scss'
+  styleUrl: './auth-page.component.scss',
+  styles: `
+    .profile-stack { display: grid; min-width: 0; gap: 1.25rem; }
+    .unverified { margin-inline: 0.25rem; color: var(--warning); font-size: 0.9rem; }
+    .account-details a { color: var(--primary); font-weight: 600; text-underline-offset: 0.2em; }
+  `
 })
 export class ProfilePageComponent {
   private readonly pageMetadata = setPrivatePageMetadata('Mój profil | Lendly', 'Zarządzaj ustawieniami swojego konta Lendly.');
@@ -112,6 +141,7 @@ export class ProfilePageComponent {
   private readonly document = inject(DOCUMENT);
 
   readonly user = this.auth.user;
+  readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn !== false);
   readonly saving = signal(false);
   readonly linking = signal(false);
   readonly signingOut = signal(false);
@@ -123,6 +153,10 @@ export class ProfilePageComponent {
     displayName: [this.user()?.displayName ?? '', [Validators.required, trimmedRequired, unicodeLength(2, 80), noControlCharacters]],
     areaLabel: [this.user()?.areaLabel ?? '', [areaLabelRules]]
   });
+
+  constructor() {
+    this.auth.loadFeatures();
+  }
 
   showDisplayNameError(): boolean {
     return this.form.controls.displayName.invalid && this.form.controls.displayName.touched;

@@ -31,7 +31,7 @@
             ],
             "assets": [
               {
-                "glob": "theme-init.js",
+                "glob": "**/*",
                 "input": "public"
               },
               {
@@ -45,6 +45,7 @@
                 "output": "maplibre"
               }
             ],
+            "serviceWorker": "ngsw-config.json",
             "server": "src/main.server.ts",
             "outputMode": "static"
           },

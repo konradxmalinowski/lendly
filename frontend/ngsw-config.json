@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.csr.html",
+  "assetGroups": [
+    {
+      "name": "app-shell",
+      "installMode": "prefetch",
+      "resources": {
+        "files": [
+          "/index.csr.html",
+          "/index.html",
+          "/items/index.html",
+          "/manifest.webmanifest",
+          "/theme-init.js",
+          "/*.js",
+          "/*.css",
+          "!/maplibre.css"
+        ]
+      }
+    },
+    {
+      "name": "assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.svg",
+          "/favicon-32.png",
+          "/apple-touch-icon.png",
+          "/icons/**",
+          "/maplibre.css",
+          "/maplibre/**"
+        ]
+      }
+    }
+  ],
+  "navigationUrls": [
+    "/**",
+    "!/**/*.*",
+    "!/**/*__*",
+    "!/**/*__*/**",
+    "!/api/**"
+  ]
+}

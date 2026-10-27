@@ -1,13 +1,15 @@
 import { Component, PLATFORM_ID, inject, signal } from '@angular/core';
 import { DOCUMENT, isPlatformBrowser } from '@angular/common';
 import { RouterLink, RouterOutlet } from '@angular/router';
+import { AccountBannerComponent } from './auth/account-banner.component';
 import { AuthService } from './auth/auth.service';
+import { PwaStatusComponent } from './pwa/pwa-status.component';
 import { ThemeService } from './theme.service';
 
 @Component({
   selector: 'lendly-root',
   standalone: true,
-  imports: [RouterLink, RouterOutlet],
+  imports: [AccountBannerComponent, PwaStatusComponent, RouterLink, RouterOutlet],
   template: `
     <a class="skip-link" href="#main">Przejdź do treści</a>
 
@@ -49,6 +51,8 @@ import { ThemeService } from './theme.service';
       </div>
     </header>
 
+    <lendly-account-banner />
+
     <main #mainContent id="main" tabindex="-1">
       <router-outlet (activate)="focusPageHeading()" />
     </main>
@@ -57,6 +61,8 @@ import { ThemeService } from './theme.service';
       <span class="footer-wordmark">lendly.</span>
       <span>Pożyczaj lokalnie.</span>
     </footer>
+
+    <lendly-pwa-status />
   `,
   styleUrl: './app.component.scss'
 })

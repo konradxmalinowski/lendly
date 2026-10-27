@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Lendly">
+<rect width="512" height="512" rx="112" fill="#244b3c"/>
+<g transform="translate(256 256) scale(1.2) translate(-256 -256)">
+<path fill="#f7f7f2" stroke="#f7f7f2" stroke-width="24" stroke-linejoin="round" d="M156 132H212V324H252V380H156Z"/>
+<circle cx="328" cy="352" r="40" fill="#a5c8b2"/>
+</g>
+</svg>

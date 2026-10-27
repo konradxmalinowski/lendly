@@ -3,20 +3,39 @@ import { CanActivateFn, Router, Routes } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 import { HomePageComponent } from './home/home-page.component';
 
+const loginTree = (router: Router, returnUrl: string) =>
+  router.createUrlTree(['/login'], { queryParams: { returnUrl } });
+
+// Any signed-in user, verified or not. Used by the profile and the verification screen.
+const sessionGuard: CanActivateFn = async (_route, state) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  await auth.initialize();
+  return auth.user() ? true : loginTree(router, state.url);
+};
+
+// Signed in with a confirmed e-mail address; unverified users are sent to the code screen.
 const signedInGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   await auth.initialize();
-  return auth.user() ? true : router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  const user = auth.user();
+  if (!user) return loginTree(router, state.url);
+  return user.emailVerified
+    ? true
+    : router.createUrlTree(['/verify-email'], { queryParams: { returnUrl: state.url } });
 };
 
 const moderatorGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   await auth.initialize();
-  const role = auth.user()?.role;
-  if (!auth.user()) return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
-  return role === 'MODERATOR' || role === 'ADMIN' ? true : router.createUrlTree(['/']);
+  const user = auth.user();
+  if (!user) return loginTree(router, state.url);
+  if (!user.emailVerified) {
+    return router.createUrlTree(['/verify-email'], { queryParams: { returnUrl: state.url } });
+  }
+  return user.role === 'MODERATOR' || user.role === 'ADMIN' ? true : router.createUrlTree(['/']);
 };
 
 export const appRoutes: Routes = [
@@ -26,12 +45,21 @@ export const appRoutes: Routes = [
     loadComponent: () => import('./auth/login-page.component').then((module) => module.LoginPageComponent)
   },
   {
+    path: 'login/mfa',
+    loadComponent: () => import('./auth/login-mfa-page.component').then((module) => module.LoginMfaPageComponent)
+  },
+  {
     path: 'register',
     loadComponent: () => import('./auth/register-page.component').then((module) => module.RegisterPageComponent)
   },
   {
+    path: 'verify-email',
+    canActivate: [sessionGuard],
+    loadComponent: () => import('./auth/verify-email-page.component').then((module) => module.VerifyEmailPageComponent)
+  },
+  {
     path: 'profile',
-    canActivate: [signedInGuard],
+    canActivate: [sessionGuard],
     loadComponent: () => import('./auth/profile-page.component').then((module) => module.ProfilePageComponent)
   },
   {

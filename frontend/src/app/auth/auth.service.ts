@@ -1,11 +1,28 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { finalize, firstValueFrom, map, Observable, of, shareReplay, tap } from 'rxjs';
-import { ApiError, AuthResponse, CsrfResponse, GoogleAuthorizationResponse, PrivateProfile } from './auth.models';
+import { isPlatformBrowser } from '@angular/common';
+import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { defer, finalize, firstValueFrom, map, Observable, of, shareReplay, tap } from 'rxjs';
+import {
+  ApiError,
+  AuthFeatures,
+  AuthResponse,
+  CsrfResponse,
+  GoogleAuthorizationResponse,
+  HealthResponse,
+  MfaChallengeResponse,
+  MfaSetup,
+  MfaStatus,
+  PrivateProfile,
+  RecoveryCodesResponse,
+  SignInResult
+} from './auth.models';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  private readonly featureFlags = signal<AuthFeatures | null>(null);
+  private featuresRequested = false;
   private readonly currentUser = signal<PrivateProfile | null>(null);
   private readonly csrfToken = signal<string | null>(null);
   private initialization: Promise<void> | null = null;
@@ -15,6 +32,8 @@ export class AuthService {
   readonly user = this.currentUser.asReadonly();
   readonly isSignedIn = computed(() => this.currentUser() !== null);
   readonly initialized = signal(false);
+  /** Null until `/api/health` answers; consumers treat null as "available" so a slow health check never blocks sign-in. */
+  readonly features = this.featureFlags.asReadonly();
 
   currentCsrfToken(): string | null {
     return this.csrfToken();
@@ -79,14 +98,102 @@ export class AuthService {
     }
   }
 
-  signIn(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>('/api/auth/login', { email, password }).pipe(
+  loadFeatures(): void {
+    if (!this.isBrowser || this.featuresRequested) {
+      return;
+    }
+    this.featuresRequested = true;
+    this.http.get<HealthResponse>('/api/health').subscribe({
+      next: (health) => {
+        if (health.features) {
+          this.featureFlags.set({
+            registration: health.features.registration !== false,
+            googleSignIn: health.features.googleSignIn !== false,
+            mfa: health.features.mfa !== false
+          });
+        }
+      },
+      error: () => {
+        this.featuresRequested = false;
+      }
+    });
+  }
+
+  signIn(email: string, password: string): Observable<SignInResult> {
+    return this.http.post<AuthResponse | MfaChallengeResponse>('/api/auth/login', { email, password }, { observe: 'response' }).pipe(
+      map((response): SignInResult => {
+        const body = response.body;
+        if (response.status === 202 || !body || !('user' in body)) {
+          return { status: 'mfa-required' };
+        }
+        this.applyAuthResponse(body);
+        return { status: 'signed-in', user: body.user };
+      }),
+      finalize(() => {
+        if (!this.currentUser()) {
+          this.csrfToken.set(null);
+        }
+      })
+    );
+  }
+
+  verifyMfa(code: string): Observable<AuthResponse> {
+    // Every attempt consumes the anonymous CSRF context, so fetch a fresh token each time.
+    return defer(() => {
+      this.csrfToken.set(null);
+      this.csrfRequest = null;
+      return this.http.post<AuthResponse>('/api/auth/mfa/verify', { code });
+    }).pipe(
       tap((response) => this.applyAuthResponse(response)),
       finalize(() => {
         if (!this.currentUser()) {
           this.csrfToken.set(null);
         }
       })
+    );
+  }
+
+  verifyEmail(code: string): Observable<PrivateProfile> {
+    return this.http.post<PrivateProfile>('/api/auth/email/verify', { code }).pipe(
+      tap((profile) => this.currentUser.set(profile))
+    );
+  }
+
+  resendEmailCode(): Observable<void> {
+    return this.http.post<void>('/api/auth/email/resend', null);
+  }
+
+  refreshProfile(): Observable<PrivateProfile> {
+    return this.http.get<PrivateProfile>('/api/me').pipe(
+      tap((profile) => this.currentUser.set(profile))
+    );
+  }
+
+  markEmailUnverified(): void {
+    this.patchUser({ emailVerified: false });
+  }
+
+  mfaStatus(): Observable<MfaStatus> {
+    return this.http.get<MfaStatus>('/api/me/mfa');
+  }
+
+  mfaSetup(): Observable<MfaSetup> {
+    return this.http.post<MfaSetup>('/api/me/mfa/setup', null);
+  }
+
+  mfaEnable(code: string): Observable<RecoveryCodesResponse> {
+    return this.http.post<RecoveryCodesResponse>('/api/me/mfa/enable', { code }).pipe(
+      tap(() => this.patchUser({ mfaEnabled: true }))
+    );
+  }
+
+  mfaRegenerateRecoveryCodes(code: string): Observable<RecoveryCodesResponse> {
+    return this.http.post<RecoveryCodesResponse>('/api/me/mfa/recovery-codes', { code });
+  }
+
+  mfaDisable(code: string): Observable<void> {
+    return this.http.post<void>('/api/me/mfa/disable', { code }).pipe(
+      tap(() => this.patchUser({ mfaEnabled: false }))
     );
   }
 
@@ -152,6 +259,10 @@ export class AuthService {
     } finally {
       this.initialized.set(true);
     }
+  }
+
+  private patchUser(changes: Partial<PrivateProfile>): void {
+    this.currentUser.update((user) => user ? { ...user, ...changes } : user);
   }
 
   private applyAuthResponse(response: AuthResponse): void {
