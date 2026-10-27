@@ -1,11 +1,25 @@
 openapi: 3.1.0
 info:
   title: Lendly API
-  version: 0.1.0
-  description: Authentication, profile, catalog, listing, reservation, moderation, and AI endpoints for the same-origin browser client.
+  version: 0.2.0
+  description: >-
+    Authentication, profile, catalog, listing, reservation, moderation, and AI endpoints for the same-origin browser client.
+    Two account gates apply across the API and return 403 with the standard error body. EMAIL_NOT_VERIFIED: an unverified user's
+    unsafe requests are rejected everywhere except /api/auth/** and exactly /api/me. MFA_SETUP_REQUIRED: every /api/moderation/**
+    request by a MODERATOR or ADMIN without MFA enabled is rejected until MFA is set up.
 servers:
   - url: /
 paths:
+  /api/health:
+    get:
+      summary: Service status and capability flags
+      description: Public. The client uses the flags to hide sign-up, Google sign-in, or MFA setup when the instance cannot offer them.
+      responses:
+        '200':
+          description: Service is up.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
   /api/auth/csrf:
     get:
       summary: Issue a synchronizer CSRF token
@@ -26,8 +40,12 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/auth/register:
     post:
-      summary: Register a local/demo password account
-      description: Disabled when secure cookies are enabled and when the explicit demo-registration switch is off. Requires an allowed Origin and one-use pre-auth CSRF token.
+      summary: Register a password account
+      description: >-
+        Open only when a mail transport is available and registration is enabled (LENDLY_REGISTRATION_ENABLED, or the demo switch);
+        otherwise 403 REGISTRATION_DISABLED. Creates an unverified account, signs it in, and emails a 6-digit code.
+        A failed delivery does not fail the request; the client can call /api/auth/email/resend.
+        Requires an allowed Origin and a one-use pre-auth CSRF token.
       security: [{ csrfToken: [] }]
       requestBody:
         required: true
@@ -37,12 +55,15 @@ paths:
       responses:
         '201': { $ref: '#/components/responses/AuthSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403': { description: 'REGISTRATION_DISABLED, or an origin or CSRF restriction.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/auth/login:
     post:
       summary: Sign in with email and password
+      description: >-
+        When the account has MFA enabled, no session is created. The API answers 202 and sets the MFA challenge cookie
+        (Path=/api/auth, 5 minutes); the client then calls /api/auth/mfa/verify.
       security: [{ csrfToken: [] }]
       requestBody:
         required: true
@@ -51,10 +72,91 @@ paths:
             schema: { $ref: '#/components/schemas/LoginRequest' }
       responses:
         '200': { $ref: '#/components/responses/AuthSuccess' }
+        '202':
+          description: Password accepted, second factor required. No access or refresh cookie is set.
+          headers:
+            Set-Cookie:
+              description: HttpOnly MFA challenge cookie, __Secure-lendly_mfa in production and lendly_mfa locally.
+              schema: { type: string }
+            Cache-Control: { schema: { type: string, example: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MfaRequired' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Invalid email or password; response is identical for both cases. }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
+  /api/auth/mfa/verify:
+    post:
+      summary: Complete sign-in with a TOTP or recovery code
+      description: >-
+        Reads the MFA challenge cookie set by /api/auth/login or by the Google callback (which then redirects to /login/mfa).
+        The challenge is single use and dies after 5 wrong codes. A wrong code consumes the pre-auth CSRF token, so fetch a fresh one
+        from /api/auth/csrf before each attempt. Codes may contain spaces or dashes. Wrong codes also count toward a durable per-user lock (see MFA_LOCKED on the 429 response): the 5th consecutive miss locks MFA codes for 15 minutes, each further 5 misses doubles the lock up to 24 hours, and a correct code resets the count.
+      security: [{ mfaChallengeCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/AuthSuccess' }
+        '400': { description: 'MFA_CODE_INVALID, or a validation error.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: 'MFA_CHALLENGE_INVALID: the challenge is missing, expired, used, or out of attempts. The cookie is cleared; sign in again.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429':
+          description: 'MFA_LOCKED (too many wrong codes for this user; Retry-After is set) or RATE_LIMITED.'
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { description: 'MFA_UNAVAILABLE: the instance has no MFA encryption key.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/auth/email/verify:
+    post:
+      summary: Verify the signed-in user's email with the 6-digit code
+      description: >-
+        The code lives 15 minutes and allows 5 attempts. Spaces and dashes in the code are ignored. Only an HMAC of the code is stored.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeRequest' }
+      responses:
+        '200':
+          description: Email verified; updated private profile.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivateProfile' }
+        '400':
+          description: 'VERIFICATION_CODE_INVALID: fieldErrors.attemptsRemaining holds the remaining attempts as a one-item string array. Also VALIDATION_ERROR.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { description: Authentication is required. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: 'EMAIL_ALREADY_VERIFIED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 'VERIFICATION_CODE_EXPIRED: the code expired or none was issued. Request a new one.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429':
+          description: 'VERIFICATION_ATTEMPTS_EXCEEDED (5 wrong codes; request a new code) or RATE_LIMITED (Retry-After is set).'
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/auth/email/resend:
+    post:
+      summary: Send a new verification code
+      description: Replaces any earlier code and resets its attempts. At most one code every 60 seconds per user, plus an hourly cap.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      responses:
+        '204': { description: A new code was sent. }
+        '401': { description: Authentication is required. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: 'EMAIL_ALREADY_VERIFIED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { description: 'MAIL_UNAVAILABLE: no mail transport, or delivery failed (the cooldown is released so the user can retry).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /api/auth/refresh:
     post:
       summary: Rotate the current refresh token
@@ -105,7 +207,7 @@ paths:
                 properties:
                   authorizationUrl: { type: string, format: uri }
         '401': { description: Authentication is required. }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403': { description: 'EMAIL_NOT_VERIFIED: linking needs a verified email. Also the standard 403 cases.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { description: Google client and secure callback configuration are unavailable. }
   /api/auth/google/callback:
@@ -116,7 +218,7 @@ paths:
         - { name: state, in: query, schema: { type: string } }
         - { name: error, in: query, schema: { type: string } }
       responses:
-        '302': { description: Redirects to a fixed local route. Provider error details are not reflected. }
+        '302': { description: 'Redirects to a fixed local route. Provider error details are not reflected. With MFA on, a challenge cookie is set and the redirect goes to /login/mfa. A local account with the same email is linked (verified account) or taken over (unverified account) automatically only when the Google email is @gmail.com or the ID token hd claim equals the email domain; otherwise the redirect is /login?auth=link-required and the user links from the profile after a password sign-in. A takeover removes the password, revokes sessions, and deletes every Google identity, MFA secret, recovery code, and challenge the account held.' }
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/me:
     get:
@@ -147,6 +249,114 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Authentication is required. }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /api/me/mfa:
+    get:
+      summary: Get the user's MFA status
+      security: [{ accessCookie: [] }]
+      responses:
+        '200':
+          description: Current MFA state. recoveryCodesRemaining is 0 while MFA is off.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MfaStatus' }
+        '401': { description: Authentication is required. }
+        '403': { description: Account is suspended. }
+  /api/me/mfa/setup:
+    post:
+      summary: Start MFA setup
+      description: Setup, enable, recovery-codes, and disable need an auth session created in the last 15 minutes (REAUTH_REQUIRED otherwise), so a stolen older session cannot enrol its own factor. Stores a pending, not yet enabled secret and replaces any earlier pending one. The secret is encrypted at rest with LENDLY_MFA_ENCRYPTION_KEY.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      responses:
+        '200':
+          description: Secret for manual entry, the otpauth URI, and a QR code as a PNG data URI.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MfaSetup' }
+        '401': { description: Authentication is required. }
+        '403': { description: 'REAUTH_REQUIRED: the auth session is older than 15 minutes; sign in again. Also the standard 403 cases.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'MFA_ALREADY_ENABLED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { description: 'MFA_UNAVAILABLE: the instance has no MFA encryption key.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/me/mfa/enable:
+    post:
+      summary: Enable MFA with a code from the authenticator app
+      description: Revokes the user's other sessions. The recovery codes are returned once and cannot be read again.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeRequest' }
+      responses:
+        '200':
+          description: MFA is on; 10 recovery codes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecoveryCodes' }
+        '400': { description: 'MFA_CODE_INVALID, or a validation error.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: Authentication is required. }
+        '403': { description: 'REAUTH_REQUIRED: the auth session is older than 15 minutes; sign in again. Also the standard 403 cases.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'MFA_SETUP_NOT_STARTED or MFA_ALREADY_ENABLED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429':
+          description: 'MFA_LOCKED (too many wrong codes for this user; Retry-After is set) or RATE_LIMITED.'
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { description: 'MFA_UNAVAILABLE.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/me/mfa/recovery-codes:
+    post:
+      summary: Replace the recovery codes
+      description: Needs a current TOTP code; a recovery code is not accepted here. The old set stops working.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeRequest' }
+      responses:
+        '200':
+          description: 10 new recovery codes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecoveryCodes' }
+        '400': { description: 'MFA_CODE_INVALID, or a validation error.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: Authentication is required. }
+        '403': { description: 'REAUTH_REQUIRED: the auth session is older than 15 minutes; sign in again. Also the standard 403 cases.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'MFA_NOT_ENABLED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429':
+          description: 'MFA_LOCKED (too many wrong codes for this user; Retry-After is set) or RATE_LIMITED.'
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { description: 'MFA_UNAVAILABLE.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/me/mfa/disable:
+    post:
+      summary: Turn MFA off
+      description: Accepts a TOTP or a recovery code and revokes the user's other sessions. MODERATOR and ADMIN accounts cannot turn MFA off.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodeRequest' }
+      responses:
+        '204': { description: MFA is off and the secret and recovery codes are deleted. }
+        '400': { description: 'MFA_CODE_INVALID, or a validation error.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: Authentication is required. }
+        '403': { description: 'MFA_REQUIRED_FOR_ROLE, or REAUTH_REQUIRED (the auth session is older than 15 minutes). Also the standard 403 cases.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'MFA_NOT_ENABLED.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429':
+          description: 'MFA_LOCKED (too many wrong codes for this user; Retry-After is set) or RATE_LIMITED.'
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { description: 'MFA_UNAVAILABLE.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /api/users/{id}:
     get:
       summary: Get a public profile projection
@@ -683,7 +893,55 @@ components:
       type: apiKey
       in: header
       name: X-CSRF-Token
+    mfaChallengeCookie:
+      type: apiKey
+      in: cookie
+      name: __Secure-lendly_mfa
+      description: Production name. Local mode uses lendly_mfa. HttpOnly, Path=/api/auth, 5-minute single-use challenge token.
   schemas:
+    Health:
+      type: object
+      required: [status, demo, features]
+      properties:
+        status: { type: string, enum: [UP] }
+        demo: { type: boolean, description: True when demo registration is open; the UI labels the instance. }
+        features:
+          type: object
+          required: [registration, googleSignIn, mfa]
+          properties:
+            registration: { type: boolean, description: Registration is enabled and a mail transport can deliver codes. }
+            googleSignIn: { type: boolean, description: Google client, secret, and callback are configured and cookies are secure. }
+            mfa: { type: boolean, description: An MFA encryption key is configured. }
+    CodeRequest:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code: { type: string, maxLength: 64, description: 'Email code or TOTP (6 digits), or a recovery code (8 characters, "abcd-efgh"). Spaces and dashes are ignored.' }
+    MfaRequired:
+      type: object
+      required: [mfaRequired]
+      properties:
+        mfaRequired: { type: boolean, enum: [true] }
+    MfaStatus:
+      type: object
+      required: [enabled, required, recoveryCodesRemaining]
+      properties:
+        enabled: { type: boolean }
+        required: { type: boolean, description: True for MODERATOR and ADMIN. }
+        recoveryCodesRemaining: { type: integer }
+    MfaSetup:
+      type: object
+      required: [secret, otpauthUri, qrImage]
+      properties:
+        secret: { type: string, description: Base32 secret for manual entry. }
+        otpauthUri: { type: string, description: 'otpauth://totp URI (SHA1, 6 digits, 30 s period).' }
+        qrImage: { type: string, description: PNG data URI of the QR code for otpauthUri. }
+    RecoveryCodes:
+      type: object
+      required: [recoveryCodes]
+      properties:
+        recoveryCodes: { type: array, minItems: 10, maxItems: 10, items: { type: string, example: abcd-efgh } }
     RegisterRequest:
       type: object
       additionalProperties: false
@@ -708,11 +966,13 @@ components:
         areaLabel: { type: [string, 'null'], minLength: 2, maxLength: 120 }
     PrivateProfile:
       type: object
-      required: [id, email, emailVerified, displayName, avatarUrl, areaLabel, role, status, registeredAt]
+      required: [id, email, emailVerified, displayName, avatarUrl, areaLabel, role, status, registeredAt, mfaEnabled, mfaRequired]
       properties:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
         emailVerified: { type: boolean }
+        mfaEnabled: { type: boolean }
+        mfaRequired: { type: boolean, description: True for MODERATOR and ADMIN, who must enable MFA before using moderation. }
         displayName: { type: string }
         avatarUrl: { type: [string, 'null'], format: uri }
         areaLabel: { type: [string, 'null'] }
@@ -923,7 +1183,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: Origin, CSRF, registration, or account-status restriction.
+      description: 'Origin, CSRF, registration, or account-status restriction. Also EMAIL_NOT_VERIFIED and MFA_SETUP_REQUIRED (see the account gates in the API description).'
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

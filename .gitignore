@@ -36,3 +36,4 @@ backend/var/
 **/.idea/
 .vscode/
 .DS_Store
+.gstack/
