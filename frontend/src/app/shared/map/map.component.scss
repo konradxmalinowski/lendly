@@ -109,3 +109,9 @@ lendly-listing-map {
 .maplibregl-ctrl-attrib {
   font-size: 0.75rem;
 }
+
+// Attribution links are 14px tall by default; padding brings the target to 24px.
+.maplibregl-ctrl-attrib a {
+  display: inline-block;
+  padding-block: 5px;
+}

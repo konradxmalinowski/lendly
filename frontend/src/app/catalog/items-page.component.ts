@@ -2,7 +2,6 @@ import { Component, DestroyRef, PLATFORM_ID, computed, inject, signal } from '@a
 import { isPlatformBrowser } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ListingMapComponent, MapPin } from '../shared/map/listing-map.component';
@@ -11,6 +10,7 @@ import { Category, ListingSummary, MapBounds, Page, PricingType, SearchQuery, Se
 import { CatalogService } from './catalog.service';
 
 const SORTS: SearchSort[] = ['newest', 'price_asc', 'price_desc', 'distance'];
+const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const PRICE_PATTERN = /^\d{1,4}([.,]\d{1,2})?$/;
 
 @Component({
@@ -166,10 +166,12 @@ const PRICE_PATTERN = /^\d{1,4}([.,]\d{1,2})?$/;
         </div>
 
         <div class="map-column">
+          <button class="skip-map" type="button" (click)="skipMap()">Pomiń mapę</button>
           <lendly-listing-map [pins]="pins()" [fitToPins]="!hasBox()" (moved)="mapMoved($event)" (pinActivated)="showResult($event)" />
           @if (pendingBounds()) {
             <button class="button-primary map-search-button" type="button" (click)="searchMapArea()">Szukaj w tym obszarze</button>
           }
+          <div id="after-map" class="map-end" tabindex="-1"></div>
         </div>
       </div>
     </section>
@@ -230,11 +232,6 @@ export class ItemsPageComponent {
   });
 
   constructor() {
-    inject(Title).setTitle('Rzeczy do pożyczenia | Lendly');
-    const meta = inject(Meta);
-    meta.updateTag({ name: 'description', content: 'Przeglądaj przedmioty do pożyczenia od osób z okolicy. Filtruj po kategorii, cenie i odległości.' });
-    meta.updateTag({ name: 'robots', content: 'index, follow' });
-
     // The prerendered page ships the search form and headings; results load in the browser.
     if (!isPlatformBrowser(inject(PLATFORM_ID))) {
       return;
@@ -337,14 +334,21 @@ export class ItemsPageComponent {
     this.mobileView.set('list');
     queueMicrotask(() => {
       const card = document.getElementById(`result-${id}`);
-      card?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      card?.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
       card?.querySelector<HTMLAnchorElement>('a')?.focus({ preventScroll: true });
     });
   }
 
   goToPage(page: number): void {
     this.navigate({ ...this.query, page: page > 0 ? page : undefined });
-    document.getElementById('page-title')?.scrollIntoView({ block: 'start' });
+    const title = document.getElementById('page-title');
+    title?.scrollIntoView({ block: 'start' });
+    // The pressed pagination button may be disabled after the page changes; keep focus at the top of the results.
+    title?.focus({ preventScroll: true });
+  }
+
+  skipMap(): void {
+    document.getElementById('after-map')?.focus();
   }
 
   reload(): void {

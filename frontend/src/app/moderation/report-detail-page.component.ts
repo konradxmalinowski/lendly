@@ -95,6 +95,7 @@ export class ReportDetailPageComponent {
 
   cancel(): void {
     this.pending.set(null);
+    setTimeout(() => document.querySelector<HTMLElement>('.actions .button-row button')?.focus());
   }
 
   confirm(): void {

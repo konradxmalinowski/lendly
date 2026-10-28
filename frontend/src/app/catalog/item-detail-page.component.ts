@@ -1,6 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { switchMap, tap } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
@@ -8,6 +7,8 @@ import { ReportButtonComponent } from '../moderation/report-button.component';
 import { BookingPanelComponent } from '../reservations/booking-panel.component';
 import { ListingMapComponent } from '../shared/map/listing-map.component';
 import { catalogErrorMessage, conditionLabels, priceLabel } from './catalog-format';
+import { listingSeo } from '../seo/listing-seo';
+import { SeoService } from '../seo/seo.service';
 import { Category, ListingDetail } from './catalog.models';
 import { CatalogService } from './catalog.service';
 
@@ -86,8 +87,7 @@ import { CatalogService } from './catalog.service';
 })
 export class ItemDetailPageComponent {
   private readonly catalog = inject(CatalogService);
-  private readonly title = inject(Title);
-  private readonly meta = inject(Meta);
+  private readonly seo = inject(SeoService);
 
   readonly listing = signal<ListingDetail | null>(null);
   readonly categories = signal<Category[]>([]);
@@ -115,6 +115,12 @@ export class ItemDetailPageComponent {
   });
 
   constructor() {
+    effect(() => {
+      const item = this.listing();
+      if (item) {
+        this.seo.apply(listingSeo(item, this.categoryName()));
+      }
+    });
     this.catalog.categories().pipe(takeUntilDestroyed()).subscribe({
       next: (categories) => this.categories.set(categories),
       error: () => this.categories.set([])
@@ -131,15 +137,11 @@ export class ItemDetailPageComponent {
       next: (listing) => {
         this.listing.set(listing);
         this.loading.set(false);
-        this.title.setTitle(`${listing.title} | Lendly`);
-        this.meta.updateTag({ name: 'description', content: listing.description.slice(0, 155) });
-        this.meta.updateTag({ name: 'robots', content: 'index, follow' });
       },
       error: (error: unknown) => {
         this.errorMessage.set(catalogErrorMessage(error));
         this.loading.set(false);
-        this.title.setTitle('Ogłoszenie niedostępne | Lendly');
-        this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
+        this.seo.apply({ title: 'Ogłoszenie niedostępne | Lendly', description: 'To ogłoszenie nie jest już dostępne.', noindex: true });
       }
     });
   }

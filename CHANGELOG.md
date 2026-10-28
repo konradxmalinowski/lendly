@@ -4,6 +4,24 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- Search engine metadata: a Polish title and description per route, canonical links to `https://lendly.com.pl`, Open Graph and Twitter tags, Organization and WebSite JSON-LD on the home page, and Product JSON-LD on listing pages built only from listing data. Private and sign-in pages are `noindex`.
+- `robots.txt` and `sitemap.xml`.
+- A "Pomiń mapę" button in the catalog that skips over the map pins and controls.
+
+### Changed
+
+- The mobile menu opens as a panel over the page with a blurred backdrop. Escape or a click on the backdrop closes it, and the page behind it cannot be scrolled or focused.
+- The theme switch reads "Ciemny motyw: włączony/wyłączony", and the main navigation marks the current page.
+- Nginx caches the unhashed icons for 7 days.
+
+### Fixed
+
+- The skip link went to the home page on every other page.
+- Placeholder text failed contrast in the dark theme.
+- Listing form and booking errors were not tied to their fields; map controls had English names; focus did not return after closing the confirm and report forms.
+
 ## [0.2.0] - 2026-10-27
 
 ### Added

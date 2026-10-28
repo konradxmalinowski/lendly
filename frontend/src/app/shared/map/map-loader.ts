@@ -7,6 +7,15 @@ export const STYLE_TIMEOUT_MS = 10_000;
 // Warsaw city centre, used only as the initial viewport when nothing better is known.
 export const DEFAULT_CENTER: [number, number] = [21.0122, 52.2297];
 
+// The page language is Polish, so the control names MapLibre announces must be too.
+const MAP_LOCALE = {
+  'Map.Title': 'Mapa',
+  'NavigationControl.ZoomIn': 'Przybliż mapę',
+  'NavigationControl.ZoomOut': 'Oddal mapę',
+  'AttributionControl.ToggleAttribution': 'Pokaż lub ukryj źródła mapy',
+  'AttributionControl.MapFeedback': 'Zgłoś uwagę do mapy'
+};
+
 let loading: Promise<MapLibre> | null = null;
 
 export function mapStyleUrl(dark: boolean): string {
@@ -66,7 +75,8 @@ export async function createMap(container: HTMLElement, center: [number, number]
     center,
     zoom,
     attributionControl: { compact: true },
-    cooperativeGestures: false
+    cooperativeGestures: false,
+    locale: MAP_LOCALE
   });
   map.addControl(new maplibre.NavigationControl({ showCompass: false }), 'top-right');
   await new Promise<void>((resolve, reject) => {

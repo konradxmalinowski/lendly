@@ -38,7 +38,7 @@
         <h2 id="basics-title">Przedmiot</h2>
         <div class="form-field">
           <label for="listing-title">Tytuł</label>
-          <input id="listing-title" type="text" formControlName="title" maxlength="100"
+          <input id="listing-title" type="text" formControlName="title" maxlength="100" aria-required="true"
             [attr.aria-invalid]="showError('title')" [attr.aria-describedby]="showError('title') ? 'title-error' : null">
           @if (showError('title')) {
             <p class="field-error" id="title-error">Wpisz tytuł od 3 do 100 znaków.</p>
@@ -47,25 +47,27 @@
 
         <div class="form-field">
           <label for="listing-description">Opis</label>
-          <textarea id="listing-description" formControlName="description" maxlength="2000" aria-describedby="description-hint"
-            [attr.aria-invalid]="showError('description')"></textarea>
+          <textarea id="listing-description" formControlName="description" maxlength="2000" aria-required="true"
+            [attr.aria-invalid]="showError('description')"
+            [attr.aria-describedby]="showError('description') ? 'description-hint description-error' : 'description-hint'"></textarea>
           <p class="field-hint" id="description-hint">Napisz, co dokładnie pożyczasz, co jest w zestawie i na co zwrócić uwagę.</p>
           @if (showError('description')) {
-            <p class="field-error" role="alert">Opis powinien mieć od 10 do 2000 znaków.</p>
+            <p class="field-error" id="description-error">Opis powinien mieć od 10 do 2000 znaków.</p>
           }
         </div>
 
         <div class="field-pair">
           <div class="form-field">
             <label for="listing-category">Kategoria</label>
-            <select id="listing-category" formControlName="categoryKey" [attr.aria-invalid]="showError('categoryKey')">
+            <select id="listing-category" formControlName="categoryKey" aria-required="true" [attr.aria-invalid]="showError('categoryKey')"
+              [attr.aria-describedby]="showError('categoryKey') ? 'category-error' : null">
               <option value="" disabled>Wybierz kategorię</option>
               @for (category of categories(); track category.key) {
                 <option [value]="category.key">{{ category.displayName }}</option>
               }
             </select>
             @if (showError('categoryKey')) {
-              <p class="field-error">Wybierz kategorię.</p>
+              <p class="field-error" id="category-error">Wybierz kategorię.</p>
             }
           </div>
           <div class="form-field">
@@ -90,10 +92,10 @@
           <div class="form-field price-field">
             <label for="listing-price">Cena za dzień (zł)</label>
             <input id="listing-price" type="text" inputmode="decimal" formControlName="dailyPrice" placeholder="np. 15,00"
-              aria-describedby="price-hint" [attr.aria-invalid]="showError('dailyPrice')">
+              [attr.aria-describedby]="showError('dailyPrice') ? 'price-hint price-error' : 'price-hint'" [attr.aria-invalid]="showError('dailyPrice')">
             <p class="field-hint" id="price-hint">Lendly nie pobiera płatności. Rozliczacie się bezpośrednio przy odbiorze.</p>
             @if (showError('dailyPrice')) {
-              <p class="field-error" role="alert">Podaj kwotę od 0,01 do 9999,99 zł.</p>
+              <p class="field-error" id="price-error">Podaj kwotę od 0,01 do 9999,99 zł.</p>
             }
           </div>
         }
@@ -149,9 +151,8 @@
         <h2 id="location-title">Punkt odbioru</h2>
         <p class="field-hint">Wskaż miejsce, w którym chcesz przekazać przedmiot. Inni zobaczą tylko okolicę w promieniu około 600 m, nie dokładny punkt.</p>
         <lendly-location-picker [point]="point()" (pointChange)="setPoint($event)" />
-        @if (point()) {
-          <p class="point-note">Punkt ustawiony.</p>
-        } @else if (pointTouched() && isActive()) {
+        <p class="point-note" role="status">@if (point()) { Punkt ustawiony. }</p>
+        @if (!point() && pointTouched() && isActive()) {
           <p class="field-error">Opublikowane ogłoszenie musi mieć punkt odbioru.</p>
         }
       </section>

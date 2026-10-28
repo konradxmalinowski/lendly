@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /api/images/
+Disallow: /api/
+Disallow: /profile
+Disallow: /account/
+Disallow: /reservations
+Disallow: /missions
+Disallow: /moderation
+Disallow: /listings/
+Disallow: /login/mfa
+Disallow: /verify-email
+
+Sitemap: https://lendly.com.pl/sitemap.xml

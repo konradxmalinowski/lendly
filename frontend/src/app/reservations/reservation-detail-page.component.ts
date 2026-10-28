@@ -101,6 +101,8 @@ export class ReservationDetailPageComponent {
 
   closeConfirm(): void {
     this.confirming.set(null);
+    // The confirmation form is removed, so focus goes back to the actions instead of falling to the page start.
+    setTimeout(() => document.querySelector<HTMLElement>('.actions .button-row button')?.focus());
   }
 
   run(action: ReservationAction): void {

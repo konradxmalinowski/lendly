@@ -15,9 +15,9 @@ let nextId = 0;
     @if (sent()) {
       <p class="report-sent" role="status">Dziękujemy. Zgłoszenie trafiło do moderacji.</p>
     } @else if (!open()) {
-      <button class="button-quiet report-trigger" type="button" (click)="toggle(true)">{{ label() }}</button>
+      <button class="button-quiet report-trigger" type="button" [id]="'report-trigger-' + uid" (click)="toggle(true)">{{ label() }}</button>
     } @else {
-      <form class="report-form" (ngSubmit)="send()" novalidate>
+      <form class="report-form" [id]="'report-form-' + uid" (ngSubmit)="send()" novalidate>
         <fieldset>
           <legend>{{ label() }}: wybierz powód</legend>
           @for (entry of reasons; track entry[0]) {
@@ -68,7 +68,9 @@ export class ReportButtonComponent {
     this.open.set(open);
     this.error.set('');
     if (open) {
-      setTimeout(() => document.querySelector<HTMLInputElement>(`input[name="reason-${this.uid}"]`)?.focus());
+      setTimeout(() => document.querySelector<HTMLInputElement>(`#report-form-${this.uid} input[type="radio"]`)?.focus());
+    } else {
+      setTimeout(() => document.getElementById(`report-trigger-${this.uid}`)?.focus());
     }
   }
 

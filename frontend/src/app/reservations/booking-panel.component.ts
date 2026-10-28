@@ -31,16 +31,18 @@ import { ReservationsService } from './reservations.service';
           <div class="date-pair">
             <div class="form-field">
               <label for="booking-start">Od</label>
-              <input id="booking-start" type="date" name="start" [min]="today" [max]="maxStart" [(ngModel)]="start" required>
+              <input id="booking-start" type="date" name="start" [min]="today" [max]="maxStart" [(ngModel)]="start" required aria-required="true"
+                [attr.aria-invalid]="selectionError() ? true : null" [attr.aria-describedby]="selectionError() ? 'booking-error' : null">
             </div>
             <div class="form-field">
               <label for="booking-end">Do (włącznie)</label>
-              <input id="booking-end" type="date" name="end" [min]="start || today" [max]="maxEnd()" [(ngModel)]="end" required>
+              <input id="booking-end" type="date" name="end" [min]="start || today" [max]="maxEnd()" [(ngModel)]="end" required aria-required="true"
+                [attr.aria-invalid]="selectionError() ? true : null" [attr.aria-describedby]="selectionError() ? 'booking-error' : null">
             </div>
           </div>
 
           @if (selectionError()) {
-            <p class="field-error" role="alert">{{ selectionError() }}</p>
+            <p class="field-error" id="booking-error" role="alert">{{ selectionError() }}</p>
           } @else if (days() > 0) {
             <p class="estimate" aria-live="polite">
               {{ daysLabel(days()) }}, <span class="price-line">{{ estimate() }}</span>

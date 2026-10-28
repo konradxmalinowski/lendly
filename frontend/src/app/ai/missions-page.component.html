@@ -6,10 +6,10 @@
   <form class="mission-form" (ngSubmit)="submit()" novalidate>
     <div class="form-field">
       <label for="mission-task">Zadanie</label>
-      <textarea id="mission-task" name="task" rows="3" maxlength="500" [(ngModel)]="task"
+      <textarea id="mission-task" name="task" rows="3" maxlength="500" [(ngModel)]="task" aria-required="true"
         placeholder="Np. chcę zamontować półkę na betonowej ścianie"></textarea>
     </div>
-    <div class="examples" aria-label="Przykłady">
+    <div class="examples" role="group" aria-label="Przykłady">
       @for (example of examples; track example) {
         <button class="example" type="button" (click)="useExample(example)">{{ example }}</button>
       }
