@@ -21,6 +21,9 @@ The `local` profile allows non-secure cookies on an HTTP loopback origin, the ma
 | `DATABASE_URL` | `jdbc:postgresql://localhost:5432/lendly` | JDBC URL of a PostgreSQL 17 database. Flyway applies migrations at startup. |
 | `DATABASE_USERNAME` | `lendly` | |
 | `DATABASE_PASSWORD` | none | Required. |
+| `LENDLY_DB_STATEMENT_TIMEOUT_MS` | 15000 | PostgreSQL `statement_timeout` for API connections. A longer statement is cancelled. Flyway uses its own connection and is not subject to it. |
+| `LENDLY_DB_IDLE_TX_TIMEOUT_MS` | 60000 | PostgreSQL `idle_in_transaction_session_timeout` for API connections. A session idle inside an open transaction is terminated. |
+| `LENDLY_DB_CONNECTION_TIMEOUT_MS` | 10000 | How long a request waits for a pooled connection before failing. The pool size keeps the Hikari default (10). |
 
 ## Authentication and sessions
 
@@ -29,7 +32,7 @@ The `local` profile allows non-secure cookies on an HTTP loopback origin, the ma
 | `LENDLY_JWT_SECRET` | empty | Canonical standard Base64 of at least 32 random bytes (`openssl rand -base64 32`). Required in production. Without it, password sign-in fails closed. The email verification code key is derived from it, so changing it invalidates pending codes and signs everyone out. |
 | `LENDLY_JWT_ISSUER` | `lendly-api` | |
 | `LENDLY_JWT_AUDIENCE` | `lendly-api` | |
-| `LENDLY_RATE_LIMIT_HMAC_KEY` | empty | At least 32 UTF-8 bytes (`openssl rand -hex 32`). Required in production and for password sign-in. |
+| `LENDLY_RATE_LIMIT_HMAC_KEY` | empty | At least 32 UTF-8 bytes (`openssl rand -hex 32`). Required in production and for password sign-in. Also keys the durable rate-limit buckets; when it is empty, the bucket key is derived from the JWT secret instead. |
 | `LENDLY_PUBLIC_ORIGIN` | empty | Exact browser origin without a path. HTTPS in production. Locally, the origin of the Angular dev server. |
 | `LENDLY_ALLOWED_ORIGINS` | empty | Comma-separated exact origins allowed to make changing requests. No wildcard. In production it must contain `LENDLY_PUBLIC_ORIGIN`. |
 | `LENDLY_SECURE_COOKIES` | `false` | Must be `true` for any HTTPS origin and in production. `false` is accepted only with the `local` profile and an HTTP localhost, 127.0.0.1, or ::1 origin. |
@@ -90,7 +93,7 @@ AI features are optional. Without a key they are hidden and keyword search still
 
 ## Rate limits
 
-Each limit is a count per window. Exceeding it returns `429 RATE_LIMITED` with `Retry-After`. All counts and windows must be positive. Buckets are in memory and per process.
+Each limit is a count per window. Exceeding it returns `429 RATE_LIMITED` with `Retry-After`. All counts and windows must be positive. Counters are stored in PostgreSQL (`rate_limit_buckets`), so they survive restarts and are shared by every API instance. Each row is keyed by an HMAC-SHA-256 digest of the limiter key and window, never a raw address, email or user id. The HMAC key is derived with a fixed label from `LENDLY_RATE_LIMIT_HMAC_KEY`, or from `LENDLY_JWT_SECRET` when that is empty; changing either secret resets all counters. With neither set the key is random per process and limits reset on restart. Expired rows are deleted every minute. If the database is unavailable the search limit lets requests through; every other limit rejects with `503 RATE_LIMIT_UNAVAILABLE`.
 
 | Count variable | Default | Window variable | Default (seconds) | Scope |
 |---|---:|---|---:|---|

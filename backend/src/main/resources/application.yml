@@ -8,12 +8,21 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/lendly}
     username: ${DATABASE_USERNAME:lendly}
     password: ${DATABASE_PASSWORD}
+    hikari:
+      connection-timeout: ${LENDLY_DB_CONNECTION_TIMEOUT_MS:10000}
+      data-source-properties:
+        # Session limits for API connections only; Flyway opens its own connection below and is not capped.
+        options: -c statement_timeout=${LENDLY_DB_STATEMENT_TIMEOUT_MS:15000} -c idle_in_transaction_session_timeout=${LENDLY_DB_IDLE_TX_TIMEOUT_MS:60000}
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
   flyway:
     enabled: true
+    # Own connection (not the API pool) so migrations are not subject to the statement timeout.
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/lendly}
+    user: ${DATABASE_USERNAME:lendly}
+    password: ${DATABASE_PASSWORD}
   servlet:
     multipart:
       max-file-size: 5MB

@@ -84,7 +84,10 @@ public class AccountService {
     public DataExport export(AuthPrincipal principal) {
         UUID userId = principal.user().id();
         limiter.dataExport(userId);
-        AuthUser user = auth.current(principal);
+        // Data access is a right, so suspended accounts may export; deleted ones may not.
+        AuthUser user = users.findById(userId).filter(found -> !found.status().equals("DELETED"))
+                .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "ACCOUNT_SUSPENDED",
+                        "This account cannot access the service."));
         return transactions.execute(status -> new DataExport(Instant.now(),
                 new AccountDtos.Profile(user.id(), user.email(), user.emailVerified(), user.displayName(),
                         user.areaLabel(), user.avatarUrl(), user.role(), user.status(), user.registeredAt()),

@@ -65,6 +65,7 @@ public class AccessCookieFilter extends OncePerRequestFilter {
     private boolean requiresActiveAccount(HttpServletRequest request) {
         String path = request.getRequestURI();
         String method = request.getMethod();
+        if ("GET".equals(method) && "/api/me/export".equals(path)) return false;
         if ("GET".equals(method) && ("/api/health".equals(path) || "/api/auth/csrf".equals(path)
                 || path.startsWith("/api/users/") || "/api/categories".equals(path) || "/api/items".equals(path)
                 || path.startsWith("/api/items/") || path.startsWith("/api/images/") || "/api/ai/status".equals(path))) return false;

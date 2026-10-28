@@ -1,7 +1,10 @@
 package pl.lendly.auth;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -16,6 +19,7 @@ import java.util.UUID;
 
 @Service
 public class SessionService {
+    private static final Logger log = LoggerFactory.getLogger(SessionService.class);
     private static final Duration SESSION_LIFETIME = Duration.ofDays(30);
     private static final Duration ACCESS_LIFETIME = Duration.ofMinutes(10);
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -27,6 +31,23 @@ public class SessionService {
         this.jdbc = jdbc;
         this.tokens = tokens;
         this.transactions = transactions;
+    }
+
+    // Refresh rows go first; the auth_sessions delete then cascades to whatever refresh rows remain.
+    @Scheduled(fixedDelay = 3_600_000, initialDelay = 60_000)
+    public void removeExpiredSessions() {
+        try {
+            transactions.executeWithoutResult(status -> {
+                jdbc.update("""
+                        DELETE FROM refresh_sessions r WHERE r.expires_at < CURRENT_TIMESTAMP - INTERVAL '1 day'
+                          AND NOT EXISTS (SELECT 1 FROM refresh_sessions o WHERE o.replaced_by_id = r.id
+                                          AND o.expires_at >= CURRENT_TIMESTAMP - INTERVAL '1 day')
+                        """);
+                jdbc.update("DELETE FROM auth_sessions WHERE expires_at < CURRENT_TIMESTAMP - INTERVAL '1 day'");
+            });
+        } catch (RuntimeException exception) {
+            log.warn("Expired session cleanup failed: {}", exception.getClass().getSimpleName());
+        }
     }
 
     @Transactional

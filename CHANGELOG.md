@@ -6,6 +6,9 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Added
 
+- Database timeouts for API connections: `LENDLY_DB_STATEMENT_TIMEOUT_MS` (default 15000), `LENDLY_DB_IDLE_TX_TIMEOUT_MS` (default 60000) and an explicit pool `LENDLY_DB_CONNECTION_TIMEOUT_MS` (default 10000). Flyway now uses its own connection so migrations are not cut short.
+- Durable rate limiting: counters moved from memory to PostgreSQL (`rate_limit_buckets`, migration V9) and survive restarts. Keys are HMAC digests derived from `LENDLY_RATE_LIMIT_HMAC_KEY`, or from the JWT secret when it is empty. The search limit fails open if the database is down; the others return `503 RATE_LIMIT_UNAVAILABLE`.
+- Hourly cleanup of `auth_sessions` and `refresh_sessions` rows that expired more than a day ago.
 - Account deletion and personal data export. `POST /api/me/delete` anonymises the account (status `DELETED`, migration V8): open reservations are cancelled, listings are archived and stripped of text, exact location and images, and sign-in data is removed. It asks for the password (or a recent sign-in for Google-only accounts), the MFA code when MFA is on, and the phrase `USUŃ`. `GET /api/me/export` downloads the user's data as JSON. `GET /api/me` gains `hasPassword`.
 - Search engine metadata: a Polish title and description per route, canonical links to `https://lendly.com.pl`, Open Graph and Twitter tags, Organization and WebSite JSON-LD on the home page, and Product JSON-LD on listing pages built only from listing data. Private and sign-in pages are `noindex`.
 - `robots.txt` and `sitemap.xml`, plus `sitemap-listings.xml` with every active listing (`GET /api/seo/sitemap-listings.xml`).
@@ -17,6 +20,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- `GET /api/me/export` is available to suspended accounts that still hold a valid session. Suspending from moderation still revokes all sessions, so in practice this applies to accounts suspended by other means.
 - Google buttons on the login page and the profile are hidden until Google sign-in is configured on the server.
 - Frontend tooling aligned on `@angular/ssr` 21.2.29; `npm audit` reports no vulnerabilities.
 - Google sign-in only signs in to existing accounts. It creates new accounts only with `LENDLY_GOOGLE_SIGNUP_ENABLED=true`; otherwise an unknown address returns to the login page with an explanation. `GET /api/health` gains `features.googleSignUp`, and the registration page shows the Google button only when it is true.
