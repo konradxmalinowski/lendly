@@ -18,7 +18,7 @@
   --error: #a12622;
   --disabled: #6a746e;
   --radius-small: 8px;
-  font-family: Inter, "Segoe UI", sans-serif;
+  font-family: "Inter Variable", Inter, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -66,7 +66,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--text-primary);
-  font-family: Inter, "Segoe UI", sans-serif;
+  font-family: "Inter Variable", Inter, "Segoe UI", sans-serif;
   // Space for the fixed PWA status cards; stays 0 while none is shown.
   padding-bottom: var(--pwa-offset, 0px);
   transition: background-color 140ms ease, color 140ms ease;
@@ -200,6 +200,10 @@ button:disabled {
 
 .field-hint {
   color: var(--text-muted);
+}
+
+.field-hint a {
+  color: var(--primary);
 }
 
 .field-error,

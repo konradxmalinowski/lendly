@@ -4,7 +4,7 @@ import { Meta, Title } from '@angular/platform-browser';
 
 export const SITE_ORIGIN = 'https://lendly.com.pl';
 export const SITE_NAME = 'Lendly';
-export const DEFAULT_IMAGE: SeoImage = { url: `${SITE_ORIGIN}/icons/icon-512.png`, width: 512, height: 512 };
+export const DEFAULT_IMAGE: SeoImage = { url: `${SITE_ORIGIN}/og-image.png`, width: 1200, height: 630, alt: 'Lendly: pożyczaj rzeczy od sąsiadów' };
 
 export interface SeoImage {
   url: string;
@@ -53,7 +53,7 @@ export class SeoService {
     this.property('og:image:height', image.height?.toString() ?? null);
     this.property('og:image:alt', image.alt ?? null);
 
-    this.name('twitter:card', page.image ? 'summary_large_image' : 'summary');
+    this.name('twitter:card', 'summary_large_image');
     this.name('twitter:title', page.title);
     this.name('twitter:description', page.description);
     this.name('twitter:image', image.url);

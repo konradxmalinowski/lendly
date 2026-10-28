@@ -62,8 +62,15 @@ import { ThemeService } from './theme.service';
     </main>
 
     <footer class="site-footer" [attr.inert]="menuOpen() ? '' : null">
-      <span class="footer-wordmark">lendly.</span>
-      <span>Pożyczaj lokalnie.</span>
+      <div class="footer-brand">
+        <span class="footer-wordmark">lendly.</span>
+        <span>Pożyczaj lokalnie.</span>
+      </div>
+      <nav class="footer-links" aria-label="Informacje prawne i kontakt">
+        <a routerLink="/privacy">Polityka prywatności</a>
+        <a routerLink="/terms">Regulamin</a>
+        <a href="mailto:kontakt@lendly.com.pl">kontakt&#64;lendly.com.pl</a>
+      </nav>
     </footer>
 
     <lendly-pwa-status />

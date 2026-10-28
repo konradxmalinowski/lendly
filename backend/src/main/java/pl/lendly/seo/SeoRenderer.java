@@ -42,9 +42,9 @@ public class SeoRenderer {
         String title = row.title() + " | " + SITE_NAME;
         String description = shorten(row.description());
         Photo cover = photos.isEmpty() ? null : photos.get(0);
-        String image = cover != null ? imageUrl(origin, cover) : origin + "/icons/icon-512.png";
-        int imageWidth = cover != null ? cover.width() : 512;
-        int imageHeight = cover != null ? cover.height() : 512;
+        String image = cover != null ? imageUrl(origin, cover) : origin + "/og-image.png";
+        int imageWidth = cover != null ? cover.width() : 1200;
+        int imageHeight = cover != null ? cover.height() : 630;
 
         List<String> lines = new ArrayList<>();
         lines.add("<title>" + escape(title) + "</title>");
@@ -61,7 +61,7 @@ public class SeoRenderer {
         lines.add(property("og:image:width", String.valueOf(imageWidth)));
         lines.add(property("og:image:height", String.valueOf(imageHeight)));
         if (cover != null) lines.add(property("og:image:alt", "Zdjęcie: " + row.title()));
-        lines.add(named("twitter:card", cover != null ? "summary_large_image" : "summary"));
+        lines.add(named("twitter:card", "summary_large_image"));
         lines.add(named("twitter:title", title));
         lines.add(named("twitter:description", description));
         lines.add(named("twitter:image", image));

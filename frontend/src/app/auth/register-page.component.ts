@@ -91,6 +91,7 @@ import { noControlCharacters, passwordRules, trimmedRequired, unicodeLength } fr
           <button class="button-primary" type="submit" [disabled]="busy()">
             {{ busy() ? 'Tworzenie konta…' : 'Utwórz konto' }}
           </button>
+          <p class="field-hint google-hint">Zakładając konto, akceptujesz <a routerLink="/terms">Regulamin</a> i <a routerLink="/privacy">Politykę prywatności</a>.</p>
         </form>
 
         <div class="auth-divider" aria-hidden="true"><span>lub</span></div>

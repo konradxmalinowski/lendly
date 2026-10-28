@@ -161,6 +161,26 @@ export const appRoutes: Routes = [
     loadComponent: () => import('./moderation/report-detail-page.component').then((module) => module.ReportDetailPageComponent)
   },
   {
+    path: 'privacy',
+    title: 'Polityka prywatności | Lendly',
+    data: {
+      seo: {
+        description: 'Jakie dane zbiera Lendly, po co, komu je przekazuje i jakie masz prawa.'
+      } satisfies RouteSeo
+    },
+    loadComponent: () => import('./legal/privacy-page.component').then((module) => module.PrivacyPageComponent)
+  },
+  {
+    path: 'terms',
+    title: 'Regulamin | Lendly',
+    data: {
+      seo: {
+        description: 'Zasady korzystania z Lendly: konto, ogłoszenia, rezerwacje i odpowiedzialność.'
+      } satisfies RouteSeo
+    },
+    loadComponent: () => import('./legal/terms-page.component').then((module) => module.TermsPageComponent)
+  },
+  {
     path: '**',
     title: 'Nie ma takiej strony | Lendly',
     data: privateSeo('Ta strona nie istnieje w Lendly.'),
