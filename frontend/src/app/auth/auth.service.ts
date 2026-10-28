@@ -7,6 +7,7 @@ import {
   AuthFeatures,
   AuthResponse,
   CsrfResponse,
+  DeleteAccountRequest,
   GoogleAuthorizationResponse,
   HealthResponse,
   MfaChallengeResponse,
@@ -227,6 +228,11 @@ export class AuthService {
     return this.http.patch<PrivateProfile>('/api/me', { displayName, areaLabel }).pipe(
       tap((profile) => this.currentUser.set(profile))
     );
+  }
+
+  /** The caller clears the local session once it has left the signed-in pages. */
+  deleteAccount(request: DeleteAccountRequest): Observable<void> {
+    return this.http.post<void>('/api/me/delete', request);
   }
 
   signOut(): Observable<void> {

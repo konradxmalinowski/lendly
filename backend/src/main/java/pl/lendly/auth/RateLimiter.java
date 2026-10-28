@@ -24,7 +24,7 @@ public class RateLimiter {
     private final RateLimitProperties limits;
     // Fixed-size keyed buckets bound memory without turning table saturation into
     // a global deny. Hash collisions can only make the affected slot stricter.
-    private final Bucket[][] buckets = new Bucket[21][BUCKET_COUNT];
+    private final Bucket[][] buckets = new Bucket[23][BUCKET_COUNT];
     private final byte[] bucketKey = new byte[32];
 
     public RateLimiter(ClientAddressResolver addresses, AuthProperties properties, RateLimitProperties limits) {
@@ -95,6 +95,14 @@ public class RateLimiter {
         hit("mfa-manage:" + userId, limits.getMfaManage(), Duration.ofSeconds(limits.getMfaManageWindowSeconds()));
     }
 
+    public void accountDelete(java.util.UUID userId) {
+        hit("account-delete:" + userId, limits.getAccountDelete(), Duration.ofSeconds(limits.getAccountDeleteWindowSeconds()));
+    }
+
+    public void dataExport(java.util.UUID userId) {
+        hit("data-export:" + userId, limits.getDataExport(), Duration.ofSeconds(limits.getDataExportWindowSeconds()));
+    }
+
     public void search(HttpServletRequest request) {
         hit("search:" + addresses.resolve(request), limits.getSearch(), Duration.ofSeconds(limits.getSearchWindowSeconds()));
     }
@@ -154,6 +162,8 @@ public class RateLimiter {
         if (key.startsWith("email-resend:")) return 18;
         if (key.startsWith("mfa-verify:")) return 19;
         if (key.startsWith("mfa-manage:")) return 20;
+        if (key.startsWith("account-delete:")) return 21;
+        if (key.startsWith("data-export:")) return 22;
         throw new IllegalArgumentException("Unknown rate-limit scope.");
     }
 

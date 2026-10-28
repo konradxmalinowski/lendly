@@ -143,7 +143,7 @@ import { RouterLink } from '@angular/router';
 
       <h2>Jak długo przechowujemy dane</h2>
       <ul>
-        <li>Dane konta, ogłoszenia i rezerwacje: dopóki masz konto albo dopóki nie poprosisz o usunięcie.</li>
+        <li>Dane konta, ogłoszenia i rezerwacje: dopóki masz konto albo dopóki go nie usuniesz.</li>
         <li>Sesje: najwyżej 30 dni od zalogowania, token dostępu działa 10 minut.</li>
         <li>Kody z e-maila: ważne krótko, wygasłe usuwamy po dobie. Wyzwania weryfikacji dwuetapowej usuwamy po godzinie od wygaśnięcia.</li>
         <li>
@@ -168,9 +168,12 @@ import { RouterLink } from '@angular/router';
         <li>cofnięcia zgody w każdej chwili, bez wpływu na wcześniejsze przetwarzanie.</li>
       </ul>
       <p>
-        Nazwę wyświetlaną i okolicę zmienisz w <a routerLink="/profile">profilu</a>. Samodzielnego usunięcia konta
-        w serwisie jeszcze nie ma. Aby usunąć konto lub skorzystać z pozostałych praw, napisz na
-        <a href="mailto:kontakt@lendly.com.pl">kontakt&#64;lendly.com.pl</a>. Możesz też złożyć skargę do Prezesa Urzędu
+        Nazwę wyświetlaną i okolicę zmienisz w <a routerLink="/profile">profilu</a>. Tam, w sekcji „Twoje dane”,
+        pobierzesz też kopię swoich danych w pliku JSON (dostęp i przenoszenie danych) oraz sam usuniesz konto.
+        Usunięcie jest ostateczne: ogłoszenia znikają z katalogu, otwarte rezerwacje zostają anulowane, a w zakończonych
+        wypożyczeniach druga strona widzi „Usunięte konto”. Z pozostałych praw skorzystasz, pisząc na
+        <a href="mailto:kontakt@lendly.com.pl">kontakt&#64;lendly.com.pl</a>. Tam możesz też poprosić o pobranie
+        danych albo usunięcie konta, jeśli nie możesz zalogować się do profilu. Masz też prawo złożyć skargę do Prezesa Urzędu
         Ochrony Danych Osobowych (<a href="https://uodo.gov.pl" rel="noopener">uodo.gov.pl</a>).
       </p>
 

@@ -5,7 +5,6 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Va
 import { Location } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { conditionLabels, statusLabels } from '../catalog/catalog-format';
 import { Category, ItemCondition, ListingImage, ListingRequest, MapPoint, OwnerListing, PricingType } from '../catalog/catalog.models';
 import { CatalogService } from '../catalog/catalog.service';
@@ -49,7 +48,6 @@ function priceRule(control: AbstractControl<string>): ValidationErrors | null {
   styleUrl: './listing-form-page.component.scss'
 })
 export class ListingFormPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Ogłoszenie | Lendly', 'Dodaj lub edytuj swoje ogłoszenie w Lendly.');
   private readonly listings = inject(ListingsService);
   private readonly location = inject(Location);
   private readonly formBuilder = inject(FormBuilder);

@@ -134,6 +134,19 @@ public class MfaService {
         if (!Boolean.TRUE.equals(done)) throw invalidCode();
     }
 
+    /** Checks a TOTP or recovery code for a sensitive action; wrong guesses are counted and locked like at sign-in. */
+    public void confirmCode(UUID userId, String input) {
+        requireAvailable();
+        String code = normalize(input);
+        Boolean accepted = transactions.execute(status -> {
+            MfaRow row = lock(userId);
+            if (row == null || !row.enabled) throw notEnabled();
+            requireUnlocked(row);
+            return check(userId, row, code, true);
+        });
+        if (!Boolean.TRUE.equals(accepted)) throw invalidCode();
+    }
+
     /** Stores only the hash of the challenge token; the raw token goes into the HttpOnly cookie. */
     public String createChallenge(UUID userId) {
         byte[] bytes = new byte[32];
@@ -229,11 +242,20 @@ public class MfaService {
 
     // Management calls need a login from the last 15 minutes, so a stolen session cannot enrol its own factor.
     private void requireRecentSession(UUID sessionId) {
+        requireRecentSession(sessionId, "Sign in again to change multi-factor settings.");
+    }
+
+    /** Same 15-minute window as MFA management, for sensitive actions of accounts that have no password. */
+    public void requireRecentLogin(UUID sessionId) {
+        requireRecentSession(sessionId, "Sign in again to confirm this action.");
+    }
+
+    private void requireRecentSession(UUID sessionId, String message) {
         Boolean recent = jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM auth_sessions WHERE id = ? AND created_at > CURRENT_TIMESTAMP - INTERVAL '15 minutes')",
                 Boolean.class, sessionId);
         if (!Boolean.TRUE.equals(recent)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "REAUTH_REQUIRED", "Sign in again to change multi-factor settings.");
+            throw new ApiException(HttpStatus.FORBIDDEN, "REAUTH_REQUIRED", message);
         }
     }
 

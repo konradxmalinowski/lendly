@@ -2,7 +2,6 @@ import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { Page } from '../catalog/catalog.models';
 import { ReservationSummary } from './reservation.models';
 import { costLabel, daysLabel, formatDeadline, formatRange, reservationErrorMessage, reservationStatusLabels } from './reservation-format';
@@ -81,7 +80,6 @@ import { ReservationsService } from './reservations.service';
   styleUrl: './reservations-page.component.scss'
 })
 export class ReservationsPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Rezerwacje | Lendly', 'Twoje prośby o rezerwację i rezerwacje Twoich ogłoszeń.');
   private readonly reservations = inject(ReservationsService);
   private subscription: Subscription | null = null;
   currentPage = 0;

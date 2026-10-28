@@ -35,7 +35,7 @@ public class AccountGateFilter extends OncePerRequestFilter {
                 return;
             }
             if (unsafe(request.getMethod()) && !user.emailVerified()
-                    && !path.startsWith("/api/auth/") && !path.equals("/api/me")) {
+                    && !path.startsWith("/api/auth/") && !path.equals("/api/me") && !path.equals("/api/me/delete")) {
                 reject(request, response, "EMAIL_NOT_VERIFIED", "Verify your email address first.");
                 return;
             }

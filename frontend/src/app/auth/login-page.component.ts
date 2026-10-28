@@ -4,7 +4,6 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { authenticationMessage, isGoogleAuthorizationUrl, safeReturnPath } from './auth-ui.helpers';
 import { AuthService } from './auth.service';
-import { setPrivatePageMetadata } from './private-page-metadata';
 
 @Component({
   selector: 'lendly-login-page',
@@ -73,17 +72,11 @@ import { setPrivatePageMetadata } from './private-page-metadata';
           </button>
         </form>
 
-        <div class="auth-divider" aria-hidden="true"><span>lub</span></div>
-        <button
-          class="button-secondary google-button"
-          type="button"
-          [disabled]="busy() || !googleAvailable()"
-          [attr.aria-describedby]="googleAvailable() ? null : 'google-unavailable'"
-          (click)="signInWithGoogle()">
-          Kontynuuj z Google
-        </button>
-        @if (!googleAvailable()) {
-          <p class="field-hint google-hint" id="google-unavailable">Logowanie przez Google jest teraz niedostępne. Użyj adresu e-mail i hasła.</p>
+        @if (googleAvailable()) {
+          <div class="auth-divider" aria-hidden="true"><span>lub</span></div>
+          <button class="button-secondary google-button" type="button" [disabled]="busy()" (click)="signInWithGoogle()">
+            Kontynuuj z Google
+          </button>
         }
 
         <p class="auth-switch">Nie masz konta? <a routerLink="/register" [queryParams]="returnQuery">Utwórz konto</a></p>
@@ -93,7 +86,6 @@ import { setPrivatePageMetadata } from './private-page-metadata';
   styleUrl: './auth-page.component.scss'
 })
 export class LoginPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Zaloguj się | Lendly', 'Zaloguj się do swojego konta Lendly.');
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -108,7 +100,8 @@ export class LoginPageComponent {
   readonly passwordVisible = signal(false);
   readonly errorMessage = signal('');
   readonly notice = signal(this.getAuthNotice());
-  readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn !== false);
+  // Shown only once the server confirms Google is configured, so an unconfigured demo has no dead button.
+  readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn === true);
   readonly returnQuery = this.route.snapshot.queryParamMap.has('returnUrl')
     ? { returnUrl: safeReturnPath(this.route.snapshot.queryParamMap.get('returnUrl')) }
     : undefined;

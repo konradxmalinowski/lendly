@@ -4,7 +4,6 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { authenticationMessage, isGoogleAuthorizationUrl, safeReturnPath } from './auth-ui.helpers';
 import { AuthService } from './auth.service';
-import { setPrivatePageMetadata } from './private-page-metadata';
 import { noControlCharacters, passwordRules, trimmedRequired, unicodeLength } from './auth.validators';
 
 @Component({
@@ -117,7 +116,6 @@ import { noControlCharacters, passwordRules, trimmedRequired, unicodeLength } fr
   styleUrl: './auth-page.component.scss'
 })
 export class RegisterPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Utwórz konto | Lendly', 'Utwórz konto, aby korzystać z Lendly.');
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

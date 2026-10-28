@@ -37,3 +37,6 @@ backend/var/
 .vscode/
 .DS_Store
 .gstack/
+
+# Audit reports name internal hosts; they stay local.
+reports/

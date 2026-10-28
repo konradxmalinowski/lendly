@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Added
 
+- Account deletion and personal data export. `POST /api/me/delete` anonymises the account (status `DELETED`, migration V8): open reservations are cancelled, listings are archived and stripped of text, exact location and images, and sign-in data is removed. It asks for the password (or a recent sign-in for Google-only accounts), the MFA code when MFA is on, and the phrase `USUŃ`. `GET /api/me/export` downloads the user's data as JSON. `GET /api/me` gains `hasPassword`.
 - Search engine metadata: a Polish title and description per route, canonical links to `https://lendly.com.pl`, Open Graph and Twitter tags, Organization and WebSite JSON-LD on the home page, and Product JSON-LD on listing pages built only from listing data. Private and sign-in pages are `noindex`.
 - `robots.txt` and `sitemap.xml`, plus `sitemap-listings.xml` with every active listing (`GET /api/seo/sitemap-listings.xml`).
 - Listing pages carry the listing's own title, description, photo and JSON-LD in the HTML that Nginx serves, through SSI and `GET /api/seo/items/{id}/head`, so link previews and crawlers see them without running JavaScript.
@@ -16,6 +17,8 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- Google buttons on the login page and the profile are hidden until Google sign-in is configured on the server.
+- Frontend tooling aligned on `@angular/ssr` 21.2.29; `npm audit` reports no vulnerabilities.
 - Google sign-in only signs in to existing accounts. It creates new accounts only with `LENDLY_GOOGLE_SIGNUP_ENABLED=true`; otherwise an unknown address returns to the login page with an explanation. `GET /api/health` gains `features.googleSignUp`, and the registration page shows the Google button only when it is true.
 - The mobile menu opens as a panel over the page with a blurred backdrop. Escape or a click on the backdrop closes it, and the page behind it cannot be scrolled or focused.
 - The theme switch reads "Ciemny motyw: włączony/wyłączony", and the main navigation marks the current page.

@@ -10,6 +10,8 @@ export interface PrivateProfile {
   registeredAt: string;
   mfaEnabled: boolean;
   mfaRequired: boolean;
+  // False for accounts that only sign in with Google.
+  hasPassword: boolean;
 }
 
 export interface AuthResponse {
@@ -66,4 +68,10 @@ export interface MfaSetup {
 
 export interface RecoveryCodesResponse {
   recoveryCodes: string[];
+}
+
+export interface DeleteAccountRequest {
+  password: string | null;
+  code: string | null;
+  confirm: string;
 }

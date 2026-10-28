@@ -6,7 +6,6 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Observable, switchMap, tap } from 'rxjs';
 import { apiErrorCode } from '../auth/auth-ui.helpers';
 import { MfaSetupPromptComponent } from '../auth/mfa-setup-prompt.component';
-import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { ModerationAction, ReportDetail, historyLabels, reportReasonLabels, reportStatusLabels } from './moderation.models';
 import { ModerationService } from './moderation.service';
 
@@ -42,7 +41,6 @@ const ACTIONS: Record<ModerationAction, ActionConfig> = {
   styleUrl: './report-detail-page.component.scss'
 })
 export class ReportDetailPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Zgłoszenie | Lendly', 'Szczegóły zgłoszenia dla moderatorów.');
   private readonly moderation = inject(ModerationService);
 
   readonly report = signal<ReportDetail | null>(null);

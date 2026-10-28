@@ -1,11 +1,14 @@
-import { Component, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, afterNextRender, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 @Component({
   selector: 'lendly-home-page',
   standalone: true,
   imports: [RouterLink],
   template: `
+    @if (accountDeleted()) {
+      <p class="account-notice" role="status">Twoje konto zostało usunięte.</p>
+    }
     <section id="start" class="intro" aria-labelledby="intro-title">
       <div class="intro-copy">
         <p class="eyebrow">Pożyczaj w swojej okolicy</p>
@@ -40,6 +43,19 @@ import { Router, RouterLink } from '@angular/router';
 })
 export class HomePageComponent {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
+  readonly accountDeleted = signal(false);
+
+  constructor() {
+    // Set after hydration so the server-rendered markup stays identical to the prerendered page.
+    afterNextRender(() => {
+      if (this.route.snapshot.queryParamMap.get('account') === 'deleted') {
+        this.accountDeleted.set(true);
+        void this.router.navigate([], { queryParams: { account: null }, queryParamsHandling: 'merge', replaceUrl: true });
+      }
+    });
+  }
 
   search(event: Event, value: string): void {
     event.preventDefault();

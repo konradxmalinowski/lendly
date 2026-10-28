@@ -61,7 +61,7 @@ public class AuthService {
         String hash = user == null || user.passwordHash() == null ? dummyHash : user.passwordHash();
         boolean matches = password != null && password.getBytes(StandardCharsets.UTF_8).length <= 72
                 && wellFormedUnicode(password) && passwordEncoder.matches(password, hash);
-        if (user == null || user.status().equals("SUSPENDED") || user.passwordHash() == null || !matches) {
+        if (user == null || !user.status().equals("ACTIVE") || user.passwordHash() == null || !matches) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Email or password is incorrect.");
         }
         if (mfa.isEnabled(user.id())) return new LoginResult(user, null, null, mfa.createChallenge(user.id()));
@@ -82,6 +82,13 @@ public class AuthService {
                 .orElseThrow(this::challengeInvalid);
         String sessionCsrf = csrf.issuePendingSessionToken();
         return new LoginResult(user, sessions.create(user.id(), sessionCsrf), sessionCsrf, null);
+    }
+
+    public boolean passwordMatches(AuthUser user, String password) {
+        String hash = user.passwordHash() == null ? dummyHash : user.passwordHash();
+        boolean matches = password != null && password.getBytes(StandardCharsets.UTF_8).length <= 72
+                && wellFormedUnicode(password) && passwordEncoder.matches(password, hash);
+        return matches && user.passwordHash() != null;
     }
 
     public AuthDtos.PrivateProfile profile(AuthUser user) { return user.privateProfile(mfa.isEnabled(user.id())); }
@@ -110,7 +117,8 @@ public class AuthService {
         UUID id;
         try { id = UUID.fromString(idValue); }
         catch (RuntimeException exception) { throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_USER_ID", "The user ID is invalid."); }
-        return repository.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "The user was not found."));
+        return repository.findById(id).filter(user -> !user.status().equals("DELETED"))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "The user was not found."));
     }
 
     private String normalizeEmail(String value) {

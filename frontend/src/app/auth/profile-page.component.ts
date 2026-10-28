@@ -2,16 +2,16 @@ import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AccountDataComponent } from './account-data.component';
 import { authenticationMessage, isGoogleAuthorizationUrl } from './auth-ui.helpers';
 import { AuthService } from './auth.service';
 import { MfaSettingsComponent } from './mfa-settings.component';
-import { setPrivatePageMetadata } from './private-page-metadata';
 import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } from './auth.validators';
 
 @Component({
   selector: 'lendly-profile-page',
   standalone: true,
-  imports: [MfaSettingsComponent, ReactiveFormsModule, RouterLink],
+  imports: [AccountDataComponent, MfaSettingsComponent, ReactiveFormsModule, RouterLink],
   template: `
     <section class="profile-page" aria-labelledby="page-title">
       <div class="profile-heading">
@@ -33,7 +33,7 @@ import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } f
       }
 
       @if (user(); as profile) {
-        <div class="profile-layout">
+        <div class="profile-layout" [class.single]="!googleAvailable()">
           <div class="profile-stack">
           <section class="profile-panel" aria-labelledby="account-details-title">
             <h2 id="account-details-title">Dane konta</h2>
@@ -106,20 +106,21 @@ import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } f
           }
           </div>
 
+          @if (googleAvailable()) {
           <section class="profile-panel connection-panel" aria-labelledby="connection-title">
             <h2 id="connection-title">Połączone konto</h2>
             <p>Połącz Google z tym kontem, aby używać go do logowania.</p>
-            <button class="button-secondary" type="button" [disabled]="busy() || !googleAvailable() || !profile.emailVerified"
-              [attr.aria-describedby]="googleAvailable() && profile.emailVerified ? null : 'google-unavailable'" (click)="linkGoogle()">
+            <button class="button-secondary" type="button" [disabled]="busy() || !profile.emailVerified"
+              [attr.aria-describedby]="profile.emailVerified ? null : 'google-unavailable'" (click)="linkGoogle()">
               Połącz z Google
             </button>
             @if (!profile.emailVerified) {
               <p class="field-hint google-hint" id="google-unavailable">Najpierw <a routerLink="/verify-email">potwierdź adres e-mail</a>, a potem połączysz konto z Google.</p>
-            } @else if (!googleAvailable()) {
-              <p class="field-hint google-hint" id="google-unavailable">Łączenie z Google jest teraz niedostępne.</p>
             }
           </section>
+          }
         </div>
+        <lendly-account-data [class.single]="!googleAvailable()" />
       } @else {
         <p class="form-error-summary" role="status">Nie udało się wczytać profilu. <a routerLink="/login">Zaloguj się ponownie</a>.</p>
       }
@@ -133,7 +134,6 @@ import { areaLabelRules, noControlCharacters, trimmedRequired, unicodeLength } f
   `
 })
 export class ProfilePageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Mój profil | Lendly', 'Zarządzaj ustawieniami swojego konta Lendly.');
   private readonly formBuilder = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -141,7 +141,7 @@ export class ProfilePageComponent {
   private readonly document = inject(DOCUMENT);
 
   readonly user = this.auth.user;
-  readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn !== false);
+  readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn === true);
   readonly saving = signal(false);
   readonly linking = signal(false);
   readonly signingOut = signal(false);

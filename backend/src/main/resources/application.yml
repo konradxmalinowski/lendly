@@ -80,6 +80,10 @@ lendly:
       mfa-verify-window-seconds: ${LENDLY_RATE_MFA_VERIFY_WINDOW_SECONDS:900}
       mfa-manage: ${LENDLY_RATE_MFA_MANAGE:10}
       mfa-manage-window-seconds: ${LENDLY_RATE_MFA_MANAGE_WINDOW_SECONDS:900}
+      account-delete: ${LENDLY_RATE_ACCOUNT_DELETE:5}
+      account-delete-window-seconds: ${LENDLY_RATE_ACCOUNT_DELETE_WINDOW_SECONDS:900}
+      data-export: ${LENDLY_RATE_DATA_EXPORT:5}
+      data-export-window-seconds: ${LENDLY_RATE_DATA_EXPORT_WINDOW_SECONDS:3600}
   mail:
     # Own namespace on purpose: spring.mail.host would auto-configure a sender even when empty.
     host: ${MAIL_HOST:}

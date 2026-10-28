@@ -13,7 +13,6 @@ import {
   safeReturnPath
 } from './auth-ui.helpers';
 import { AuthService } from './auth.service';
-import { setPrivatePageMetadata } from './private-page-metadata';
 
 const RESEND_WINDOW_SECONDS = 60;
 
@@ -100,7 +99,6 @@ const RESEND_WINDOW_SECONDS = 60;
   styleUrls: ['./auth-page.component.scss', './auth-code.scss']
 })
 export class VerifyEmailPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Potwierdź adres e-mail | Lendly', 'Wpisz kod z wiadomości, aby potwierdzić adres e-mail.');
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);

@@ -2,7 +2,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { distanceLabel, priceLabel } from '../catalog/catalog-format';
 import { ListingSummary } from '../catalog/catalog.models';
 import { addDays, warsawToday } from '../reservations/reservation-format';
@@ -22,7 +21,6 @@ const EXAMPLES = [
   styleUrl: './missions-page.component.scss'
 })
 export class MissionsPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Misje | Lendly', 'Opisz zadanie, a znajdziemy rzeczy do pożyczenia w okolicy.');
   private readonly ai = inject(AiService);
   readonly examples = EXAMPLES;
   readonly today = warsawToday();

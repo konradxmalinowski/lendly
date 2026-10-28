@@ -249,6 +249,66 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Authentication is required. }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /api/me/delete:
+    post:
+      summary: Delete the authenticated user's account
+      description: >-
+        Anonymises the account in one transaction and signs the user out (the response clears the auth cookies).
+        Open reservations (PENDING, ACCEPTED, ACTIVE) as borrower or owner become CANCELLED with the reason "Konto zostało usunięte.";
+        free text the user wrote on other reservations is cleared. The user's listings are archived, their description is replaced,
+        the handover point becomes the public point, and images and owner blocks are deleted (files are removed after commit).
+        The user row stays with email deleted-<id>@deleted.invalid, display name "Usunięte konto" and status DELETED; sign-in methods,
+        sessions and MFA data are deleted. Reports and moderation actions stay. The email address can be registered again.
+        Checks run in this order: confirm phrase, rate limit (5 per 15 minutes per user), password (accounts that have one) or a
+        session younger than 15 minutes (Google-only accounts), MFA code (when MFA is on), last-admin rule.
+        Allowed for unverified accounts. Suspended accounts get ACCOUNT_SUSPENDED.
+      security: [{ accessCookie: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeleteAccountRequest' }
+      responses:
+        '204': { description: Account deleted and auth cookies cleared. }
+        '401': { description: 'INVALID_CREDENTIALS (wrong or missing password) or authentication is required.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: 'REAUTH_REQUIRED (Google-only account, session older than 15 minutes) or the standard 403 cases.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'LAST_ADMIN: the only active administrator cannot be deleted.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422': { description: 'VALIDATION_ERROR (fieldErrors.confirm when the phrase is not exactly USUŃ) or MFA_CODE_REQUIRED (MFA is on and code is missing).', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '400': { description: 'MFA_CODE_INVALID: the TOTP or recovery code is wrong, already used, or replayed.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429':
+          description: 'RATE_LIMITED, or MFA_LOCKED (too many wrong codes for this user). Retry-After is set.'
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { description: 'MFA_UNAVAILABLE.', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/me/export:
+    get:
+      summary: Download the user's personal data
+      description: >-
+        Returns a JSON attachment (lendly-dane-YYYY-MM-DD.json, Cache-Control no-store). Contains the profile, linked Google
+        accounts, MFA state, the user's listings with images and blocks, reservations as borrower or owner (only the user's own
+        free text; the other party appears by display name), submitted reports, and active sessions. Never contains password hashes,
+        MFA secrets, token hashes, or other users' private data. Limited to 5 requests per hour per user.
+      security: [{ accessCookie: [] }]
+      responses:
+        '200':
+          description: The export.
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataExport' }
+        '401': { description: Authentication is required. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429':
+          description: RATE_LIMITED.
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/me/mfa:
     get:
       summary: Get the user's MFA status
@@ -987,15 +1047,131 @@ components:
       properties:
         displayName: { type: string, minLength: 2, maxLength: 80 }
         areaLabel: { type: [string, 'null'], minLength: 2, maxLength: 120 }
+    DeleteAccountRequest:
+      type: object
+      required: [confirm]
+      properties:
+        password: { type: [string, 'null'], description: Required when the account has a password (hasPassword is true). }
+        code: { type: [string, 'null'], description: TOTP or recovery code. Required when MFA is on. }
+        confirm: { type: string, enum: ['USUŃ'] }
+    DataExport:
+      type: object
+      required: [exportedAt, profile, google, mfa, listings, reservations, reports, sessions]
+      properties:
+        exportedAt: { type: string, format: date-time }
+        profile:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            email: { type: string }
+            emailVerified: { type: boolean }
+            displayName: { type: string }
+            areaLabel: { type: [string, 'null'] }
+            avatarUrl: { type: [string, 'null'] }
+            role: { type: string }
+            status: { type: string }
+            createdAt: { type: string, format: date-time }
+        google:
+          type: array
+          items:
+            type: object
+            properties:
+              providerEmail: { type: [string, 'null'] }
+              linkedAt: { type: string, format: date-time }
+        mfa:
+          type: object
+          properties:
+            enabled: { type: boolean }
+            enabledAt: { type: [string, 'null'], format: date-time }
+            recoveryCodesLeft: { type: integer }
+        listings:
+          type: array
+          items:
+            type: object
+            description: All the user's listings in any status, including the private handover point.
+            properties:
+              id: { type: string, format: uuid }
+              title: { type: string }
+              description: { type: string }
+              categoryKey: { type: string }
+              condition: { type: string }
+              pricingType: { type: string }
+              dailyPrice: { type: [number, 'null'] }
+              currency: { type: string }
+              status: { type: string }
+              handoverLat: { type: [number, 'null'] }
+              handoverLng: { type: [number, 'null'] }
+              publicLat: { type: [number, 'null'] }
+              publicLng: { type: [number, 'null'] }
+              createdAt: { type: string, format: date-time }
+              publishedAt: { type: [string, 'null'], format: date-time }
+              images:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    url: { type: string }
+                    width: { type: integer }
+                    height: { type: integer }
+              blocks:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    startDate: { type: string, format: date }
+                    endDate: { type: string, format: date }
+        reservations:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              role: { type: string, enum: [BORROWER, OWNER] }
+              listingId: { type: string, format: uuid }
+              listingTitle: { type: string }
+              counterpartDisplayName: { type: string }
+              status: { type: string }
+              startDate: { type: string, format: date }
+              endDate: { type: string, format: date }
+              estimatedCost: { type: number }
+              currency: { type: string }
+              note: { type: [string, 'null'], description: The borrower's note; present only when the user is the borrower. }
+              reason: { type: [string, 'null'], description: Present only when the user wrote the decision or cancellation reason. }
+              createdAt: { type: string, format: date-time }
+              decidedAt: { type: [string, 'null'], format: date-time }
+              handedOverAt: { type: [string, 'null'], format: date-time }
+              returnedAt: { type: [string, 'null'], format: date-time }
+              cancelledAt: { type: [string, 'null'], format: date-time }
+        reports:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              targetType: { type: string, enum: [LISTING, USER] }
+              targetId: { type: string, format: uuid }
+              reason: { type: string }
+              details: { type: [string, 'null'] }
+              createdAt: { type: string, format: date-time }
+              status: { type: string }
+        sessions:
+          type: array
+          items:
+            type: object
+            properties:
+              createdAt: { type: string, format: date-time }
+              expiresAt: { type: string, format: date-time }
     PrivateProfile:
       type: object
-      required: [id, email, emailVerified, displayName, avatarUrl, areaLabel, role, status, registeredAt, mfaEnabled, mfaRequired]
+      required: [id, email, emailVerified, displayName, avatarUrl, areaLabel, role, status, registeredAt, mfaEnabled, mfaRequired, hasPassword]
       properties:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
         emailVerified: { type: boolean }
         mfaEnabled: { type: boolean }
         mfaRequired: { type: boolean, description: True for MODERATOR and ADMIN, who must enable MFA before using moderation. }
+        hasPassword: { type: boolean, description: False for accounts that sign in with Google only. }
         displayName: { type: string }
         avatarUrl: { type: [string, 'null'], format: uri }
         areaLabel: { type: [string, 'null'] }

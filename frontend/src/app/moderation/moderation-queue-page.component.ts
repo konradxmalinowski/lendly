@@ -4,7 +4,6 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { apiErrorCode } from '../auth/auth-ui.helpers';
 import { MfaSetupPromptComponent } from '../auth/mfa-setup-prompt.component';
-import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { Page } from '../catalog/catalog.models';
 import { ReportSummary, ReportTargetType, reportReasonLabels, reportStatusLabels } from './moderation.models';
 import { ModerationService } from './moderation.service';
@@ -113,7 +112,6 @@ import { ModerationService } from './moderation.service';
   `
 })
 export class ModerationQueuePageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Moderacja | Lendly', 'Kolejka zgłoszeń dla moderatorów.');
   private readonly moderation = inject(ModerationService);
   private readonly router = inject(Router);
   private subscription: Subscription | null = null;

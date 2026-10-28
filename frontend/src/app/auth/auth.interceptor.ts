@@ -6,6 +6,8 @@ import { apiErrorCode, safeReturnPath } from './auth-ui.helpers';
 import { AuthService } from './auth.service';
 
 const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// A wrong password or code is an answer, not an expired session: retrying would count the attempt twice.
+const NEVER_REFRESH_CODES = new Set(['INVALID_CREDENTIALS', 'MFA_CODE_INVALID', 'INVALID_MFA_CODE']);
 const AUTH_RETRY = new HttpContextToken<boolean>(() => false);
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
@@ -41,6 +43,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
       error.status !== 401 ||
       !isApiRequest ||
       isAuthEndpoint ||
+      NEVER_REFRESH_CODES.has(apiErrorCode(error) ?? '') ||
       request.context.get(AUTH_RETRY)
     ) {
       return throwError(() => error);

@@ -1,7 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { priceLabel, statusLabels } from '../catalog/catalog-format';
 import { OwnerListing, Page } from '../catalog/catalog.models';
 import { ListingsService } from './listings.service';
@@ -90,7 +89,6 @@ import { reservationErrorMessage } from '../reservations/reservation-format';
   styleUrl: './my-listings-page.component.scss'
 })
 export class MyListingsPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Moje ogłoszenia | Lendly', 'Zarządzaj swoimi ogłoszeniami w Lendly.');
   private readonly listings = inject(ListingsService);
   currentPage = 0;
 

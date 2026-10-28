@@ -319,3 +319,11 @@ button:disabled {
   display: inline-block;
   padding-block: 0.4rem;
 }
+
+// Profile without the Google panel has no second column; keep every card one readable width.
+.profile-page .profile-layout.single,
+lendly-account-data.single {
+  display: grid;
+  max-width: 760px;
+  grid-template-columns: minmax(0, 1fr);
+}

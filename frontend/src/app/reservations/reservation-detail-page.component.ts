@@ -3,7 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { switchMap, tap } from 'rxjs';
-import { setPrivatePageMetadata } from '../auth/private-page-metadata';
 import { priceLabel } from '../catalog/catalog-format';
 import { ReportButtonComponent } from '../moderation/report-button.component';
 import { ListingMapComponent, MapPin } from '../shared/map/listing-map.component';
@@ -29,7 +28,6 @@ const SUCCESS: Record<ReservationAction, string> = {
   styleUrl: './reservation-detail-page.component.scss'
 })
 export class ReservationDetailPageComponent {
-  private readonly pageMetadata = setPrivatePageMetadata('Rezerwacja | Lendly', 'Szczegóły rezerwacji w Lendly.');
   private readonly reservations = inject(ReservationsService);
   private readonly route = inject(ActivatedRoute);
 

@@ -43,6 +43,10 @@ public class RateLimitProperties {
     private long mfaVerifyWindowSeconds = 900;
     private int mfaManage = 10;
     private long mfaManageWindowSeconds = 900;
+    private int accountDelete = 5;
+    private long accountDeleteWindowSeconds = 900;
+    private int dataExport = 5;
+    private long dataExportWindowSeconds = 3600;
 
     public int getRegistration() { return registration; }
     public void setRegistration(int value) { registration = value; }
@@ -122,4 +126,12 @@ public class RateLimitProperties {
     public void setMfaManage(int value) { mfaManage = value; }
     public long getMfaManageWindowSeconds() { return mfaManageWindowSeconds; }
     public void setMfaManageWindowSeconds(long value) { mfaManageWindowSeconds = value; }
+    public int getAccountDelete() { return accountDelete; }
+    public void setAccountDelete(int value) { accountDelete = value; }
+    public long getAccountDeleteWindowSeconds() { return accountDeleteWindowSeconds; }
+    public void setAccountDeleteWindowSeconds(long value) { accountDeleteWindowSeconds = value; }
+    public int getDataExport() { return dataExport; }
+    public void setDataExport(int value) { dataExport = value; }
+    public long getDataExportWindowSeconds() { return dataExportWindowSeconds; }
+    public void setDataExportWindowSeconds(long value) { dataExportWindowSeconds = value; }
 }
