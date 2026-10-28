@@ -1,0 +1,118 @@
+name: Deploy
+
+# Deploys only from main. No pull_request triggers: the deploy job runs on a self-hosted runner inside the demo network.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.editorconfig'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to release
+        type: choice
+        options: [all, api, web]
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.14.1
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build web
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build API
+        working-directory: backend
+        run: mvn -B -DskipTests package
+
+      - name: Assemble release
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/release"
+          mkdir -p "$out/prebuilt" "$out/deploy/scripts" "$out/deploy/nginx" "$out/deploy/systemd"
+          jars=(backend/target/lendly-api-*.jar)
+          [ "${#jars[@]}" -eq 1 ] && [ -f "${jars[0]}" ] || { echo "expected exactly one API jar" >&2; exit 1; }
+          cp "${jars[0]}" "$out/prebuilt/lendly-api.jar"
+          cp -R frontend/dist/lendly/browser "$out/prebuilt/web"
+          cp deploy/scripts/deploy.sh "$out/deploy/scripts/"
+          cp deploy/nginx/lendly.conf "$out/deploy/nginx/"
+          cp deploy/systemd/lendly-api.service "$out/deploy/systemd/"
+          echo "$GITHUB_SHA" > "$out/REVISION"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lendly-release
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, lendly-deploy]
+    environment: production
+    timeout-minutes: 20
+    env:
+      # Lives on the runner host, outside the repository, so no host details are stored in GitHub.
+      LENDLY_HOSTS_ENV: /etc/lendly-deploy/hosts.env
+      TARGET: ${{ inputs.target || 'all' }}
+    steps:
+      - name: Mask host details
+        run: |
+          set -euo pipefail
+          . "$LENDLY_HOSTS_ENV"
+          for value in "$WEB_HOST" "$API_HOST" "$SSH_USER" "${TRUSTED_PROXY:-}"; do
+            [ -z "$value" ] || echo "::add-mask::$value"
+          done
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lendly-release
+          path: ${{ runner.temp }}/release
+
+      - name: Release
+        working-directory: ${{ runner.temp }}/release
+        env:
+          LENDLY_PREBUILT_DIR: ${{ runner.temp }}/release/prebuilt
+        run: bash deploy/scripts/deploy.sh "$TARGET"
+
+      - name: Verify
+        run: |
+          set -euo pipefail
+          . "$LENDLY_HOSTS_ENV"
+          curl -fsS --max-time 15 -o /dev/null -w "web HTTP %{http_code}\n" "http://$WEB_HOST/"
+          curl -fsS --max-time 15 "http://$WEB_HOST/api/health"
+          echo

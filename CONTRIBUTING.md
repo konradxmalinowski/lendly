@@ -107,6 +107,8 @@ The project has no automated test suite yet. Check a change by building both par
 
 ## Pull requests
 
+Deployments run only from `main`, after a maintainer merges. Pull requests never trigger a deployment, and workflows from forks wait for maintainer approval.
+
 - Keep a pull request to one change and explain why it is needed.
 - Update [docs/api/openapi.yaml](docs/api/openapi.yaml) when an endpoint, field, or error code changes.
 - Update [docs/configuration.md](docs/configuration.md) and `backend/.env.example` when you add or change an environment variable.
