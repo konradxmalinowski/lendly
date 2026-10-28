@@ -55,6 +55,7 @@ public class SecurityConfiguration {
                                             AccountGateFilter accountGateFilter,
                                             ObjectMapper objectMapper) throws Exception {
         return http
+                // Replaced, not dropped: CsrfProtectionFilter (synchronizer token plus exact Origin check) is added below.
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.disable())
                 .formLogin(form -> form.disable())
