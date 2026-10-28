@@ -34,6 +34,7 @@ lendly:
     demo-registration: ${LENDLY_DEMO_REGISTRATION:false}
     demo-registration-on-https: ${LENDLY_DEMO_REGISTRATION_ON_HTTPS:false}
     registration-enabled: ${LENDLY_REGISTRATION_ENABLED:false}
+    google-signup-enabled: ${LENDLY_GOOGLE_SIGNUP_ENABLED:false}
     mfa-encryption-key: ${LENDLY_MFA_ENCRYPTION_KEY:}
     mfa-encryption-key-previous: ${LENDLY_MFA_ENCRYPTION_KEY_PREVIOUS:}
     rate-limit-hmac-key: ${LENDLY_RATE_LIMIT_HMAC_KEY:}

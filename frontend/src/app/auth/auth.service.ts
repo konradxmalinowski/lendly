@@ -109,6 +109,7 @@ export class AuthService {
           this.featureFlags.set({
             registration: health.features.registration !== false,
             googleSignIn: health.features.googleSignIn !== false,
+            googleSignUp: health.features.googleSignUp === true,
             mfa: health.features.mfa !== false
           });
         }

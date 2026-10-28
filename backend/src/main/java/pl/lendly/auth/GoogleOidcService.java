@@ -77,7 +77,10 @@ public class GoogleOidcService {
             if (linked != null) return linked.status().equals("ACTIVE") ? CallbackResult.signedIn(linked) : CallbackResult.failure(false);
             AuthUser local = users.findByEmail(identity.email).orElse(null);
             try {
-                if (local == null) return CallbackResult.signedIn(createUser(identity));
+                // Google signs in to existing accounts only, unless sign-up through Google is switched on.
+                if (local == null) {
+                    return properties.isGoogleSignupEnabled() ? CallbackResult.signedIn(createUser(identity)) : CallbackResult.noAccount();
+                }
                 // Only Gmail or a Workspace domain vouched for by `hd` proves control of the address; any other
                 // domain can change hands, so those users link from the profile after a password sign-in.
                 if (!authoritativeFor(identity)) return CallbackResult.linkRequired();
@@ -209,8 +212,9 @@ public class GoogleOidcService {
     public record CallbackResult(Kind kind, AuthUser user, boolean linkIntent) {
         static CallbackResult failure(boolean linkIntent) { return new CallbackResult(Kind.FAILURE, null, linkIntent); }
         static CallbackResult linkRequired() { return new CallbackResult(Kind.LINK_REQUIRED, null, false); }
+        static CallbackResult noAccount() { return new CallbackResult(Kind.NO_ACCOUNT, null, false); }
         static CallbackResult linked() { return new CallbackResult(Kind.LINKED, null, true); }
         static CallbackResult signedIn(AuthUser user) { return new CallbackResult(Kind.SIGNED_IN, user, false); }
-        public enum Kind { FAILURE, LINK_REQUIRED, LINKED, SIGNED_IN }
+        public enum Kind { FAILURE, LINK_REQUIRED, NO_ACCOUNT, LINKED, SIGNED_IN }
     }
 }

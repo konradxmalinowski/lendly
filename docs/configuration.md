@@ -59,13 +59,14 @@ With an empty `MAIL_HOST`, the `local` profile with `LENDLY_SECURE_COOKIES=false
 
 ## Google sign-in
 
-Google signs in automatically to an existing local account only when the address is `@gmail.com` or the ID token `hd` claim equals the email domain; other users link from their profile. Set all three together, with secure cookies on and `LENDLY_PUBLIC_ORIGIN` set to the same HTTPS origin as the callback. Without them, Google sign-in is unavailable.
+Google signs in automatically to an existing local account only when the address is `@gmail.com` or the ID token `hd` claim equals the email domain; other users link from their profile. Google does not create accounts unless `LENDLY_GOOGLE_SIGNUP_ENABLED` is `true`; an unknown Google address is sent back to the login page (`/login?auth=no-account`). Set the first three together, with secure cookies on and `LENDLY_PUBLIC_ORIGIN` set to the same HTTPS origin as the callback. Without them, Google sign-in is unavailable.
 
 | Variable | Default | Notes |
 |---|---|---|
 | `GOOGLE_OIDC_CLIENT_ID` | empty | OAuth client ID. |
 | `GOOGLE_OIDC_CLIENT_SECRET` | empty | OAuth client secret. |
 | `LENDLY_GOOGLE_CALLBACK_URL` | empty | Must end in `/api/auth/google/callback` and be registered with Google. |
+| `LENDLY_GOOGLE_SIGNUP_ENABLED` | `false` | When `true`, Google sign-in also creates an account for an unknown address. |
 
 ## Storage
 

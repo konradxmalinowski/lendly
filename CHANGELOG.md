@@ -16,6 +16,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- Google sign-in only signs in to existing accounts. It creates new accounts only with `LENDLY_GOOGLE_SIGNUP_ENABLED=true`; otherwise an unknown address returns to the login page with an explanation. `GET /api/health` gains `features.googleSignUp`, and the registration page shows the Google button only when it is true.
 - The mobile menu opens as a panel over the page with a blurred backdrop. Escape or a click on the backdrop closes it, and the page behind it cannot be scrolled or focused.
 - The theme switch reads "Ciemny motyw: włączony/wyłączony", and the main navigation marks the current page.
 - Nginx caches the unhashed icons for 7 days.

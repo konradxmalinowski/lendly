@@ -158,6 +158,7 @@ public class AuthController {
             }
             case LINKED -> { return redirect("/profile?google=linked"); }
             case LINK_REQUIRED -> { return redirect("/login?auth=link-required"); }
+            case NO_ACCOUNT -> { return redirect("/login?auth=no-account"); }
             case FAILURE -> { return redirect(result.linkIntent() ? "/profile?google=link-failed" : "/login?auth=failed"); }
             default -> { return redirect("/login?auth=failed"); }
         }

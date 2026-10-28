@@ -218,7 +218,7 @@ paths:
         - { name: state, in: query, schema: { type: string } }
         - { name: error, in: query, schema: { type: string } }
       responses:
-        '302': { description: 'Redirects to a fixed local route. Provider error details are not reflected. With MFA on, a challenge cookie is set and the redirect goes to /login/mfa. A local account with the same email is linked (verified account) or taken over (unverified account) automatically only when the Google email is @gmail.com or the ID token hd claim equals the email domain; otherwise the redirect is /login?auth=link-required and the user links from the profile after a password sign-in. A takeover removes the password, revokes sessions, and deletes every Google identity, MFA secret, recovery code, and challenge the account held.' }
+        '302': { description: 'Redirects to a fixed local route. Provider error details are not reflected. With MFA on, a challenge cookie is set and the redirect goes to /login/mfa. A local account with the same email is linked (verified account) or taken over (unverified account) automatically only when the Google email is @gmail.com or the ID token hd claim equals the email domain; otherwise the redirect is /login?auth=link-required and the user links from the profile after a password sign-in. A Google address with no local account is not registered (unless LENDLY_GOOGLE_SIGNUP_ENABLED is true); the redirect is /login?auth=no-account. A takeover removes the password, revokes sessions, and deletes every Google identity, MFA secret, recovery code, and challenge the account held.' }
         '429': { description: 'RATE_LIMITED (Retry-After is set) or VERIFICATION_LOCKED (20 lifetime wrong codes; only an operator reset clears it).', headers: { Retry-After: { schema: { type: integer } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /api/me:
     get:
@@ -929,10 +929,11 @@ components:
         demo: { type: boolean, description: True when demo registration is open; the UI labels the instance. }
         features:
           type: object
-          required: [registration, googleSignIn, mfa]
+          required: [registration, googleSignIn, googleSignUp, mfa]
           properties:
             registration: { type: boolean, description: Registration is enabled and a mail transport can deliver codes. }
             googleSignIn: { type: boolean, description: Google client, secret, and callback are configured and cookies are secure. }
+            googleSignUp: { type: boolean, description: Google sign-in may also create new accounts (LENDLY_GOOGLE_SIGNUP_ENABLED). When false it only signs in to existing accounts. }
             mfa: { type: boolean, description: An MFA encryption key is configured. }
     CodeRequest:
       type: object

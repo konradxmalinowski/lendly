@@ -35,6 +35,8 @@ export interface GoogleAuthorizationResponse {
 export interface AuthFeatures {
   registration: boolean;
   googleSignIn: boolean;
+  // Google creates new accounts only when this is on; otherwise it signs in to existing ones.
+  googleSignUp: boolean;
   mfa: boolean;
 }
 

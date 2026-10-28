@@ -94,6 +94,7 @@ import { noControlCharacters, passwordRules, trimmedRequired, unicodeLength } fr
           <p class="field-hint google-hint">Zakładając konto, akceptujesz <a routerLink="/terms">Regulamin</a> i <a routerLink="/privacy">Politykę prywatności</a>.</p>
         </form>
 
+        @if (googleSignUp()) {
         <div class="auth-divider" aria-hidden="true"><span>lub</span></div>
         <button
           class="button-secondary google-button"
@@ -105,6 +106,7 @@ import { noControlCharacters, passwordRules, trimmedRequired, unicodeLength } fr
         </button>
         @if (!googleAvailable()) {
           <p class="field-hint google-hint" id="google-unavailable">Logowanie przez Google jest teraz niedostępne. Użyj adresu e-mail i hasła.</p>
+        }
         }
 
         <p class="auth-switch">Masz już konto? <a routerLink="/login" [queryParams]="returnQuery">Zaloguj się</a></p>
@@ -132,6 +134,7 @@ export class RegisterPageComponent {
   readonly errorMessage = signal('');
   readonly registrationOpen = computed(() => this.auth.features()?.registration !== false);
   readonly googleAvailable = computed(() => this.auth.features()?.googleSignIn !== false);
+  readonly googleSignUp = computed(() => this.auth.features()?.googleSignUp === true);
   readonly returnQuery = this.route.snapshot.queryParamMap.has('returnUrl')
     ? { returnUrl: safeReturnPath(this.route.snapshot.queryParamMap.get('returnUrl')) }
     : undefined;

@@ -22,12 +22,13 @@ public class HealthController {
     @GetMapping("/api/health")
     HealthResponse health() {
         return new HealthResponse("UP", auth.registrationOpen(), new Features(
-                auth.registrationAllowed(mail.available()), auth.googleConfigured(), mfa.available()));
+                auth.registrationAllowed(mail.available()), auth.googleConfigured(),
+                auth.googleConfigured() && auth.isGoogleSignupEnabled(), mfa.available()));
     }
 
     record HealthResponse(String status, boolean demo, Features features) {
     }
 
-    record Features(boolean registration, boolean googleSignIn, boolean mfa) {
+    record Features(boolean registration, boolean googleSignIn, boolean googleSignUp, boolean mfa) {
     }
 }

@@ -183,6 +183,9 @@ export class LoginPageComponent {
     if (code === 'link-required') {
       return 'Ten adres jest już używany. Zaloguj się na istniejące konto, a potem połącz je z Google w profilu.';
     }
+    if (code === 'no-account') {
+      return 'Nie ma konta Lendly z adresem tego konta Google. Zaloguj się e-mailem i hasłem, a potem połącz konto Google w profilu.';
+    }
     if (code === 'mfa-expired') {
       return 'Czas na wpisanie kodu minął albo kod podano zbyt wiele razy. Zaloguj się jeszcze raz.';
     }

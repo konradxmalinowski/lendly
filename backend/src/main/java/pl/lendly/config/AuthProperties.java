@@ -18,6 +18,7 @@ public class AuthProperties {
     private boolean demoRegistration = false;
     private boolean demoRegistrationOnHttps = false;
     private boolean registrationEnabled = false;
+    private boolean googleSignupEnabled = false;
     private String mfaEncryptionKey = "";
     private String mfaEncryptionKeyPrevious = "";
     private String rateLimitHmacKey = "";
@@ -50,6 +51,8 @@ public class AuthProperties {
     }
     public boolean isRegistrationEnabled() { return registrationEnabled; }
     public void setRegistrationEnabled(boolean value) { this.registrationEnabled = value; }
+    public boolean isGoogleSignupEnabled() { return googleSignupEnabled; }
+    public void setGoogleSignupEnabled(boolean value) { this.googleSignupEnabled = value; }
     /** Public or demo registration is allowed only when a mail transport can deliver the verification code. */
     public boolean registrationAllowed(boolean mailAvailable) {
         return mailAvailable && (registrationEnabled || registrationOpen());
