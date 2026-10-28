@@ -121,6 +121,15 @@ Each limit is a count per window. Exceeding it returns `429 RATE_LIMITED` with `
 | `LENDLY_RATE_AI_SCAN` | 20 | `LENDLY_RATE_AI_SCAN_WINDOW_SECONDS` | 3600 | User |
 | `LENDLY_RATE_MISSION` | 30 | `LENDLY_RATE_MISSION_WINDOW_SECONDS` | 3600 | User |
 
+AI cost caps count Scan and Missions together over 24 hours, on top of the hourly limits above. Both are checked before any call to the model provider.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `LENDLY_AI_USER_DAILY_LIMIT` | 40 | Model calls per user per 24 hours. `429 RATE_LIMITED`. |
+| `LENDLY_AI_GLOBAL_DAILY_LIMIT` | 300 | Model calls for the whole instance per 24 hours. `429 AI_DAILY_LIMIT`. `0` switches AI suggestions off. |
+
+Also set a monthly spending limit in the provider's console (Google AI Studio or OpenAI); the app caps request counts, not money.
+
 ## Deployment script settings
 
 These are read by `deploy/scripts/deploy.sh` from `deploy/hosts.env`, not by the API. Copy `deploy/hosts.env.example`.

@@ -35,6 +35,8 @@ public class RateLimitProperties {
     private long aiScanWindowSeconds = 3600;
     private int mission = 30;
     private long missionWindowSeconds = 3600;
+    private int aiUserDaily = 40;
+    private int aiGlobalDaily = 300;
     private int emailVerify = 10;
     private long emailVerifyWindowSeconds = 900;
     private int emailResend = 5;
@@ -110,6 +112,10 @@ public class RateLimitProperties {
     public void setMission(int value) { mission = value; }
     public long getMissionWindowSeconds() { return missionWindowSeconds; }
     public void setMissionWindowSeconds(long value) { missionWindowSeconds = value; }
+    public int getAiUserDaily() { return aiUserDaily; }
+    public void setAiUserDaily(int value) { aiUserDaily = value; }
+    public int getAiGlobalDaily() { return aiGlobalDaily; }
+    public void setAiGlobalDaily(int value) { aiGlobalDaily = value; }
     public int getEmailVerify() { return emailVerify; }
     public void setEmailVerify(int value) { emailVerify = value; }
     public long getEmailVerifyWindowSeconds() { return emailVerifyWindowSeconds; }

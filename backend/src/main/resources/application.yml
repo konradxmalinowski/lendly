@@ -81,6 +81,9 @@ lendly:
       ai-scan-window-seconds: ${LENDLY_RATE_AI_SCAN_WINDOW_SECONDS:3600}
       mission: ${LENDLY_RATE_MISSION:30}
       mission-window-seconds: ${LENDLY_RATE_MISSION_WINDOW_SECONDS:3600}
+      # Cost caps for paid model calls (Scan and Missions together), per 24 hours.
+      ai-user-daily: ${LENDLY_AI_USER_DAILY_LIMIT:40}
+      ai-global-daily: ${LENDLY_AI_GLOBAL_DAILY_LIMIT:300}
       email-verify: ${LENDLY_RATE_EMAIL_VERIFY:10}
       email-verify-window-seconds: ${LENDLY_RATE_EMAIL_VERIFY_WINDOW_SECONDS:900}
       email-resend: ${LENDLY_RATE_EMAIL_RESEND:5}

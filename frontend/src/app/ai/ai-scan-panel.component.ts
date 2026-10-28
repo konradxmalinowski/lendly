@@ -114,8 +114,10 @@ export class AiScanPanelComponent {
         },
         error: (error: unknown) => {
           this.busy.set(false);
-          this.error.set(error instanceof HttpErrorResponse && error.status === 429
-            ? 'Wykorzystano limit analiz na tę godzinę. Wypełnij pola ręcznie albo spróbuj później.'
+          this.error.set(error instanceof HttpErrorResponse && error.error?.code === 'AI_DAILY_LIMIT'
+            ? 'Dzienny limit podpowiedzi AI w Lendly został wykorzystany. Wypełnij pola ręcznie, wszystko działa bez nich.'
+            : error instanceof HttpErrorResponse && error.status === 429
+            ? 'Wykorzystano limit analiz. Wypełnij pola ręcznie albo spróbuj później.'
             : 'Podpowiedzi są teraz niedostępne. Wypełnij pola ręcznie, wszystko działa bez nich.');
         }
       });

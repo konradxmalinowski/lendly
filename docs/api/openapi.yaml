@@ -932,7 +932,7 @@ paths:
                   note: { type: [string, 'null'] }
         '413': { description: The file is larger than 5 MB. }
         '422': { description: Invalid image. }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '429': { description: 'RATE_LIMITED (hourly or per-user daily limit) or AI_DAILY_LIMIT (instance-wide daily cap). Retry-After is set.' }
         '503': { description: 'AI_UNAVAILABLE: no key configured or the provider failed.' }
   /api/ai/missions:
     post:
@@ -958,7 +958,7 @@ paths:
         '200':
           description: '{ aiUsed, summary, safetyNote, groups[{ name, essential, why, listings[ListingSummary] }], fallbackListings[ListingSummary] }'
         '400': { $ref: '#/components/responses/BadRequest' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+        '429': { description: 'RATE_LIMITED (hourly or per-user daily limit) or AI_DAILY_LIMIT (instance-wide daily cap). Retry-After is set.' }
 components:
   securitySchemes:
     accessCookie:

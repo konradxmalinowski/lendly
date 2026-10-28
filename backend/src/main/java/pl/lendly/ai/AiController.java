@@ -48,6 +48,7 @@ public class AiController {
     ResponseEntity<ScanResult> scan(@AuthenticationPrincipal AuthPrincipal principal, @RequestPart("file") MultipartFile file)
             throws IOException {
         rateLimiter.aiScan(principal.user().id());
+        rateLimiter.aiDaily(principal.user().id());
         if (file.isEmpty() || file.getSize() > ImageProcessor.MAX_BYTES) {
             throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "IMAGE_TOO_LARGE", "The image must be at most 5 MB.");
         }
@@ -57,6 +58,7 @@ public class AiController {
     @PostMapping("/missions")
     ResponseEntity<MissionResult> mission(@AuthenticationPrincipal AuthPrincipal principal, @Valid @RequestBody MissionRequest request) {
         rateLimiter.mission(principal.user().id());
+        rateLimiter.aiDaily(principal.user().id());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(missions.run(request));
     }
 }

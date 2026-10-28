@@ -39,6 +39,7 @@ public class AuthConfigurationGuard implements ApplicationRunner {
                 || limits.getReportCreate() < 1 || limits.getReportCreateWindowSeconds() < 1
                 || limits.getAiScan() < 1 || limits.getAiScanWindowSeconds() < 1
                 || limits.getMission() < 1 || limits.getMissionWindowSeconds() < 1
+                || limits.getAiUserDaily() < 0 || limits.getAiGlobalDaily() < 0
                 || limits.getEmailVerify() < 1 || limits.getEmailVerifyWindowSeconds() < 1
                 || limits.getEmailResend() < 1 || limits.getEmailResendWindowSeconds() < 1
                 || limits.getMfaVerify() < 1 || limits.getMfaVerifyWindowSeconds() < 1

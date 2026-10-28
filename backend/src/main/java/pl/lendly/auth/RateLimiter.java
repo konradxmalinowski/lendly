@@ -78,6 +78,12 @@ public class RateLimiter {
         hit("mission:" + userId, limits.getMission(), Duration.ofSeconds(limits.getMissionWindowSeconds()));
     }
 
+    // Daily cost caps for model calls: one per user, one for the whole instance, so leaked or shared accounts cannot run up the bill.
+    public void aiDaily(java.util.UUID userId) {
+        hit("ai-daily:" + userId, limits.getAiUserDaily(), Duration.ofDays(1));
+        hit("ai-global", limits.getAiGlobalDaily(), Duration.ofDays(1), false, "AI_DAILY_LIMIT");
+    }
+
     public void emailVerify(java.util.UUID userId) {
         hit("email-verify:" + userId, limits.getEmailVerify(), Duration.ofSeconds(limits.getEmailVerifyWindowSeconds()));
     }
@@ -118,8 +124,10 @@ public class RateLimiter {
 
     private void hit(String key, int limit, Duration window) { hit(key, limit, window, false); }
 
+    private void hit(String key, int limit, Duration window, boolean failOpen) { hit(key, limit, window, failOpen, "RATE_LIMITED"); }
+
     // Single atomic upsert on the database clock. Called outside business transactions so a rollback never refunds a hit.
-    private void hit(String key, int limit, Duration window, boolean failOpen) {
+    private void hit(String key, int limit, Duration window, boolean failOpen, String code) {
         try {
             long seconds = window.toSeconds();
             long[] result = jdbc.queryForObject("""
@@ -130,7 +138,7 @@ public class RateLimiter {
                         expires_at = CASE WHEN b.expires_at <= CURRENT_TIMESTAMP THEN EXCLUDED.expires_at ELSE b.expires_at END
                     RETURNING b.hit_count, GREATEST(1, CEIL(EXTRACT(EPOCH FROM (b.expires_at - CURRENT_TIMESTAMP))))::bigint
                     """, (rs, row) -> new long[] {rs.getLong(1), rs.getLong(2)}, bucketKey(key, seconds), seconds);
-            if (result != null && result[0] > limit) throw limited(result[1]);
+            if (result != null && result[0] > limit) throw limited(result[1], code);
         } catch (DataAccessException exception) {
             if (failOpen) {
                 log.warn("Rate limiter unavailable, allowing request: {}", exception.getClass().getSimpleName());
@@ -185,8 +193,10 @@ public class RateLimiter {
         }
     }
 
-    private ApiException limited(long seconds) {
-        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "Too many requests.", seconds);
+    private ApiException limited(long seconds) { return limited(seconds, "RATE_LIMITED"); }
+
+    private ApiException limited(long seconds, String code) {
+        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, code, "Too many requests.", seconds);
     }
 
     private String hmac(String value) {

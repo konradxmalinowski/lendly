@@ -96,8 +96,10 @@ export class MissionsPageComponent {
       },
       error: (error: unknown) => {
         this.loading.set(false);
-        this.error.set(error instanceof HttpErrorResponse && error.status === 429
-          ? 'Wykorzystano limit misji na tę godzinę. Możesz skorzystać ze zwykłej wyszukiwarki.'
+        this.error.set(error instanceof HttpErrorResponse && error.error?.code === 'AI_DAILY_LIMIT'
+          ? 'Dzienny limit Misji w Lendly został wykorzystany. Spróbuj jutro albo skorzystaj ze zwykłej wyszukiwarki.'
+          : error instanceof HttpErrorResponse && error.status === 429
+          ? 'Wykorzystano limit misji. Możesz skorzystać ze zwykłej wyszukiwarki.'
           : error instanceof HttpErrorResponse && error.status === 400
             ? 'Sprawdź opis zadania i daty.'
             : 'Nie udało się wyszukać. Spróbuj ponownie albo skorzystaj ze zwykłej wyszukiwarki.');

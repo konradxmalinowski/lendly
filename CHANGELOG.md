@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Added
 
+- Daily AI cost caps: 40 model calls per user and 300 for the whole instance per 24 hours (`LENDLY_AI_USER_DAILY_LIMIT`, `LENDLY_AI_GLOBAL_DAILY_LIMIT`; `0` turns AI off). The instance cap returns `429 AI_DAILY_LIMIT` and the UI explains it.
 - Database timeouts for API connections: `LENDLY_DB_STATEMENT_TIMEOUT_MS` (default 15000), `LENDLY_DB_IDLE_TX_TIMEOUT_MS` (default 60000) and an explicit pool `LENDLY_DB_CONNECTION_TIMEOUT_MS` (default 10000). Flyway now uses its own connection so migrations are not cut short.
 - Durable rate limiting: counters moved from memory to PostgreSQL (`rate_limit_buckets`, migration V9) and survive restarts. Keys are HMAC digests derived from `LENDLY_RATE_LIMIT_HMAC_KEY`, or from the JWT secret when it is empty. The search limit fails open if the database is down; the others return `503 RATE_LIMIT_UNAVAILABLE`.
 - Hourly cleanup of `auth_sessions` and `refresh_sessions` rows that expired more than a day ago.
