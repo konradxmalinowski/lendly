@@ -74,6 +74,7 @@ public class AccountService {
             repository.clearReservationText(userId);
             List<String> keys = repository.retireListings(userId);
             repository.deleteAuthData(userId);
+            repository.clearReportDetails(userId);
             repository.anonymise(userId);
             return keys;
         });

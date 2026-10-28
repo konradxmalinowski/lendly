@@ -152,6 +152,7 @@ import { RouterLink } from '@angular/router';
         </li>
         <li>
           Zgłoszenia i decyzje moderacji: tak długo, jak są potrzebne do obsługi zgłoszenia i obrony przed roszczeniami.
+          Gdy usuniesz konto, opis Twoich zgłoszeń jest kasowany, a zostaje tylko ich kategoria.
         </li>
         <li>Dzienniki serwera WWW: przez ograniczony czas potrzebny do zapewnienia bezpieczeństwa i diagnostyki.</li>
       </ul>

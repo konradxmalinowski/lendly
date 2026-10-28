@@ -82,6 +82,11 @@ public class AccountRepository {
         jdbc.update("DELETE FROM email_verification_codes WHERE user_id = ?", userId);
     }
 
+    // The reason category stays for moderation statistics; the free text is the reporter's own words.
+    public void clearReportDetails(UUID reporterId) {
+        jdbc.update("UPDATE content_reports SET details = NULL WHERE reporter_id = ?", reporterId);
+    }
+
     public void anonymise(UUID userId) {
         jdbc.update("""
                 UPDATE users SET email = ?, display_name = ?, password_hash = NULL, area_label = NULL, avatar_url = NULL,
