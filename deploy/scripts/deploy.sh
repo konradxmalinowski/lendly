@@ -101,6 +101,10 @@ release_web() {
     web_dir="$ROOT/frontend/dist/lendly/browser"
   fi
   [ -d "$web_dir" ] && [ -n "$(ls -A "$web_dir")" ] || { echo "web build not found: $web_dir" >&2; exit 1; }
+  # Listing pages get their head tags from the API through Nginx SSI; the default tags stay as the fallback stub.
+  grep -q '<!-- seo:start -->' "$web_dir/index.csr.html" || { echo "seo markers missing from index.csr.html" >&2; exit 1; }
+  perl -0pe 's{<!-- seo:start -->(.*?)<!-- seo:end -->}{<!--# block name="seo_default" -->$1<!--# endblock --><!--# include virtual="/api/seo/items/\$listing_id/head" stub="seo_default" -->}s' \
+    "$web_dir/index.csr.html" > "$web_dir/listing.html"
   tar --version 2>/dev/null | grep -q bsdtar && tar_meta=--no-mac-metadata
   tgz=$(mktemp "${TMPDIR:-/tmp}/lendly-web.XXXXXX")
   COPYFILE_DISABLE=1 tar $tar_meta -C "$web_dir" -czf "$tgz" .

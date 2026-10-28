@@ -160,5 +160,10 @@ export const appRoutes: Routes = [
     canActivate: [moderatorGuard],
     loadComponent: () => import('./moderation/report-detail-page.component').then((module) => module.ReportDetailPageComponent)
   },
-  { path: '**', redirectTo: '' }
+  {
+    path: '**',
+    title: 'Nie ma takiej strony | Lendly',
+    data: privateSeo('Ta strona nie istnieje w Lendly.'),
+    loadComponent: () => import('./not-found-page.component').then((module) => module.NotFoundPageComponent)
+  }
 ];

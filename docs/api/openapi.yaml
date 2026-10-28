@@ -517,6 +517,28 @@ paths:
         '204': { description: Removed. }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { description: The last image of an ACTIVE listing cannot be removed. }
+  /api/seo/items/{id}/head:
+    get:
+      summary: HTML head fragment for one listing (SSI include for crawlers and link previews)
+      description: Always 200, even for an invalid ID or a listing that is not ACTIVE (then only a noindex title, description and robots tag). Every value is HTML-escaped. Publicly cacheable for 5 minutes.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Title, description, robots, canonical, Open Graph, Twitter and JSON-LD tags (script#lendly-jsonld).
+          content:
+            text/html:
+              schema: { type: string }
+  /api/seo/sitemap-listings.xml:
+    get:
+      summary: Sitemap of public listings
+      description: Up to 50000 ACTIVE listings of ACTIVE owners, newest first, with lastmod as an ISO date. Publicly cacheable for 1 hour.
+      responses:
+        '200':
+          description: Sitemap urlset.
+          content:
+            application/xml:
+              schema: { type: string }
   /api/images/{imageId}:
     get:
       summary: Read a listing image

@@ -12,3 +12,4 @@ Disallow: /login/mfa
 Disallow: /verify-email
 
 Sitemap: https://lendly.com.pl/sitemap.xml
+Sitemap: https://lendly.com.pl/sitemap-listings.xml

@@ -78,7 +78,8 @@ public class SecurityConfiguration {
                 }))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/api/health", "/api/auth/csrf", "/api/auth/google/callback", "/api/users/*",
-                                "/api/categories", "/api/items", "/api/items/*", "/api/items/*/availability", "/api/images/*", "/api/ai/status").permitAll()
+                                "/api/categories", "/api/items", "/api/items/*", "/api/items/*/availability", "/api/images/*", "/api/ai/status",
+                                "/api/seo/items/*/head", "/api/seo/sitemap-listings.xml").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh",
                                 "/api/auth/logout", "/api/auth/google", "/api/auth/mfa/verify").permitAll()
                         .requestMatchers("/api/moderation/users/**").hasRole("ADMIN")

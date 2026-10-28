@@ -115,3 +115,16 @@ lendly-listing-map {
   display: inline-block;
   padding-block: 5px;
 }
+
+// The library focus style is a thin blue shadow; use the theme focus colour with an offset ring visible on any background.
+.maplibregl-ctrl button:focus-visible,
+.maplibregl-ctrl-attrib a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.maplibregl-ctrl-group button:focus-visible {
+  position: relative;
+  z-index: 1;
+}
