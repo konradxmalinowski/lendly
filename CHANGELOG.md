@@ -22,6 +22,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Changed
 
+- Deployment supports running web, API and database on one host: `deploy.sh` reads an optional `API_UPSTREAM` for the Nginx `/api/` upstream (defaults to `API_HOST`).
 - `GET /api/me/export` is available to suspended accounts that still hold a valid session. Suspending from moderation still revokes all sessions, so in practice this applies to accounts suspended by other means.
 - Google buttons on the login page and the profile are hidden until Google sign-in is configured on the server.
 - Frontend tooling aligned on `@angular/ssr` 21.2.29; `npm audit` reports no vulnerabilities.
