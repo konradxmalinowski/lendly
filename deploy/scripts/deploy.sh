@@ -2,7 +2,8 @@
 # Build locally and release to the VMs. Usage:
 #   deploy/scripts/deploy.sh api|web|all        build, upload a timestamped release, switch, restart, health check
 #   deploy/scripts/deploy.sh rollback api|web   switch back to the previous release
-# Hosts come from deploy/hosts.env (WEB_HOST, API_HOST, SSH_USER; optional TRUSTED_PROXY), or from the file named by LENDLY_HOSTS_ENV.
+# Hosts come from deploy/hosts.env (WEB_HOST, API_HOST, SSH_USER; optional TRUSTED_PROXY, API_UPSTREAM), or from the file named by LENDLY_HOSTS_ENV.
+# API_UPSTREAM is the address Nginx proxies /api/ to; it defaults to API_HOST. Set it to 127.0.0.1 when web and API share one host.
 # LENDLY_PREBUILT_DIR skips the local build: the jar is taken from <dir>/lendly-api.jar and the web build from <dir>/web.
 # Requires key-based SSH and sudo on the VMs.
 set -euo pipefail
@@ -11,6 +12,7 @@ HOSTS_ENV=${LENDLY_HOSTS_ENV:-$ROOT/deploy/hosts.env}
 PREBUILT=${LENDLY_PREBUILT_DIR:-}
 # shellcheck source=/dev/null
 . "$HOSTS_ENV"
+API_UPSTREAM=${API_UPSTREAM:-$API_HOST}
 SSH="ssh -o BatchMode=yes"
 STAMP=$(date -u +%Y%m%d%H%M%S)
 export LC_ALL=C.UTF-8
@@ -117,7 +119,7 @@ conf=/etc/nginx/sites-available/lendly.conf
 install -d -m 755 /var/www/lendly/releases/$STAMP
 tar -C /var/www/lendly/releases/$STAMP -xzf /tmp/lendly-web.tgz
 rm -f /tmp/lendly-web.tgz
-sed "s/__API_HOST__/$API_HOST/g; s/__WEB_HOST__/$WEB_HOST/g; $PROXY_SED" /tmp/lendly.conf > "\$conf.new"
+sed "s/__API_HOST__/$API_UPSTREAM/g; s/__WEB_HOST__/$WEB_HOST/g; $PROXY_SED" /tmp/lendly.conf > "\$conf.new"
 rm -f /tmp/lendly.conf
 rm -f "\$conf.bak"
 [ -f "\$conf" ] && cp -p "\$conf" "\$conf.bak"
